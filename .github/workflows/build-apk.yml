@@ -12,24 +12,21 @@ jobs:
         run: |
           echo "Repo mein ye files hain:"; ls -la
           USE=""
-          for Z in *.zip; do
-            [ -e "$Z" ] || continue
-            if [ "$(unzip -Z1 "$Z" | grep -c 'NeonHome.kt')" -gt 0 ]; then USE="$Z"; fi
+          for Z in *.zip*; do
+            [ -f "$Z" ] || continue
+            cp "$Z" /tmp/candidate.zip
+            if [ "$(unzip -Z1 /tmp/candidate.zip 2>/dev/null | grep -c 'NeonHome.kt')" -gt 0 ]; then USE="$Z"; cp /tmp/candidate.zip /tmp/chosen.zip; fi
           done
-          if [ -n "$USE" ]; then
-            echo "NAYA ZIP MILA: $USE"
-            unzip -q "$USE" -d _unz
-            PROJ=$(find _unz -name settings.gradle.kts | head -n1)
-          else
-            PROJ=$(find . -name settings.gradle.kts -not -path './_unz/*' | head -n1)
+          if [ -z "$USE" ]; then
+            echo "ERROR: Repo mein v1.3 (NeonHome.kt wala) zip nahi mila."
+            exit 1
           fi
+          echo "NAYA ZIP MILA: $USE"
+          unzip -q /tmp/chosen.zip -d _unz
+          PROJ=$(find _unz -name settings.gradle.kts | head -n1)
           DIR=$(dirname "$PROJ")
           echo "PROJECT FOLDER: $DIR"
           grep -n "versionName" "$DIR/app/build.gradle.kts" || true
-          if [ ! -f "$DIR/app/src/main/java/com/divya/ai/NeonHome.kt" ]; then
-            echo "ERROR: Repo mein v1.3 (NeonHome.kt wala) project nahi mila. Naya v1.3 zip upload karo."
-            exit 1
-          fi
           echo "dir=$DIR" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         with:
