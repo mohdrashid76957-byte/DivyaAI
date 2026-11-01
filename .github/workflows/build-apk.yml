@@ -7,44 +7,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Find project
+      - name: Find project (sabse naya versionCode wala zip)
         id: proj
         run: |
           echo "Repo mein ye files hain:"; ls -la
-          USE=""
+          BEST=""; BESTVC=-1; BESTDIR=""
+          i=0
           for Z in *.zip*; do
             [ -f "$Z" ] || continue
-            cp "$Z" /tmp/candidate.zip
-            if [ "$(unzip -Z1 /tmp/candidate.zip 2>/dev/null | grep -c 'NeonHome.kt')" -gt 0 ]; then USE="$Z"; cp /tmp/candidate.zip /tmp/chosen.zip; fi
-          done
-          if [ -z "$USE" ]; then
-            echo "ERROR: Repo mein v1.3 (NeonHome.kt wala) zip nahi mila."
-            exit 1
-          fi
-          echo "NAYA ZIP MILA: $USE"
-          unzip -q /tmp/chosen.zip -d _unz
-          PROJ=$(find _unz -name settings.gradle.kts | head -n1)
-          DIR=$(dirname "$PROJ")
-          echo "PROJECT FOLDER: $DIR"
-          grep -n "versionName" "$DIR/app/build.gradle.kts" || true
-          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      - name: Prepare Android SDK
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0"
-      - name: Give Gradle more memory
-        run: echo "org.gradle.jvmargs=-Xmx3g" >> "${{ steps.proj.outputs.dir }}/gradle.properties"
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.9
-      - name: Build APK
-        working-directory: ${{ steps.proj.outputs.dir }}
-        run: gradle assembleDebug --no-daemon --stacktrace
-      - uses: actions/upload-artifact@v4
-        with:
-          name: DivyaAI-v1.3-apk
-          path: ${{ steps.proj.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+            if [ "$(unzip -Z1 "$Z" 2>/dev/null | grep -c 'NeonHome.kt')" -eq 0 ]; then continue; fi
+            i=$((i+1)); D="_unz/$i"; mkdir -p "$D"; unzip -q "$Z" -d "$D"
+            G=$(find "$D" -path '*app/build.gradle.kts' | head -n1)
+            VC=$(grep -oE 'versionCode = [0-9]+' "$G
