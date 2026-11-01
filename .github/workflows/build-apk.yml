@@ -12,7 +12,7 @@ jobs:
 
       - name: Unzip project
         run: |
-          ZIP="$(ls -t DivyaAI_*.zip | head -1)"
+          ZIP="$(ls DivyaAI_*.zip | sort -V | tail -1)"
           echo "Using $ZIP"
           unzip -o "$ZIP"
           ls
