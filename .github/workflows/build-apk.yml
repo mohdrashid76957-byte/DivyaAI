@@ -1,36 +1,41 @@
-name: Build APK
+name: Build Divya APK
+
 on:
   push:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Unzip project
-        id: proj
         run: |
-          ls -la
-          unzip -q DivyaAI_v1.5.1_project.zip -d _unz
-          DIR=$(dirname $(find _unz -name settings.gradle.kts | head -n1))
-          echo "PROJECT FOLDER: $DIR"
-          grep -n versionName $DIR/app/build.gradle.kts
-          echo "dir=$DIR" >> $GITHUB_OUTPUT
+          ZIP="$(ls -t DivyaAI_*.zip | head -1)"
+          echo "Using $ZIP"
+          unzip -o "$ZIP"
+          ls
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: "17"
+
       - name: Prepare Android SDK
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0"
+
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.9
+          gradle-version: "8.9"
+
       - name: Build APK
-        working-directory: ${{ steps.proj.outputs.dir }}
-        run: gradle assembleDebug --no-daemon --stacktrace
+        working-directory: DivyaAI
+        run: gradle assembleDebug --stacktrace
+
       - uses: actions/upload-artifact@v4
         with:
           name: DivyaAI-apk
-          path: ${{ steps.proj.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          path: DivyaAI/app/build/outputs/apk/debug/app-debug.apk
