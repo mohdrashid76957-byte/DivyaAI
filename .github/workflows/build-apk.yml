@@ -19,3 +19,4 @@ jobs:
             i=$((i+1)); D="_unz/$i"; mkdir -p "$D"; unzip -q "$Z" -d "$D"
             G=$(find "$D" -path '*app/build.gradle.kts' | head -n1)
             VC=$(grep -oE 'versionCode = [0-9]+' "$G
+            
