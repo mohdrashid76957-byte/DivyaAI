@@ -29,6 +29,7 @@ object ProEngine {
         .readTimeout(0, TimeUnit.MILLISECONDS).writeTimeout(60, TimeUnit.SECONDS).build()
 
     @Volatile var curCall: okhttp3.Call? = null
+    @Volatile var lastModel = ""          // akhri baar kaunsa model use hua (header mein dikhta hai)
 
     private fun prefs(c: Context) = c.getSharedPreferences("divya", 0)
     fun key(c: Context) = prefs(c).getString("key", "") ?: ""
@@ -46,6 +47,13 @@ object ProEngine {
         try { discover(c) } catch (_: Exception) {}
         val v = p.getString(ck, "") ?: ""
         return v.ifBlank { if (pro) "gemini-pro-latest" else "gemini-flash-latest" }
+    }
+
+    /** Model busy (503/429) ho to agla model (jo abhi try nahi hua). */
+    fun fallbackModel(c: Context, tried: Set<String>, pro: Boolean): String? {
+        val l = (prefs(c).getString(if (pro) "autoProList" else "autoFastList", "") ?: "").split(",").filter { it.isNotBlank() }
+        val extra = if (pro) listOf("gemini-pro-latest", "gemini-flash-latest") else listOf("gemini-flash-latest")
+        return (l + extra).firstOrNull { it !in tried }
     }
 
     private fun discover(c: Context) {
@@ -70,12 +78,16 @@ object ProEngine {
         val bad = listOf("live", "tts", "image", "embed", "audio", "robotics", "computer", "native", "customtools", "vision", "learnlm", "8b", "thinking", "exp", "latest")
         fun ver(n: String) = Regex("^gemini-(\\d+(?:\\.\\d+)?)").find(n)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
         val cands = names.filter { n -> n.startsWith("gemini-") && bad.none { n.contains(it) } }
-        fun best(f: (String) -> Boolean) = cands.filter(f)
-            .sortedWith(compareByDescending<String> { ver(it) }.thenBy { it.contains("preview") }.thenBy { it.length }).firstOrNull()
-        val fast = best { it.contains("flash") && !it.contains("lite") } ?: best { it.contains("flash") }
-        val pro = best { it.contains("-pro") }
-        if (fast == null && pro == null) return
-        prefs(c).edit().putString("autoFast", fast ?: pro ?: "").putString("autoPro", pro ?: fast ?: "").putLong("autoAt", System.currentTimeMillis()).apply()
+        fun ranked(f: (String) -> Boolean) = cands.filter(f)
+            .sortedWith(compareBy<String> { it.contains("lite") }.thenByDescending { ver(it) }.thenBy { it.contains("preview") }.thenBy { it.length })
+        val fastList = ranked { it.contains("flash") }
+        val proList = ranked { it.contains("-pro") }
+        if (fastList.isEmpty() && proList.isEmpty()) return
+        val fast = fastList.firstOrNull(); val pro = proList.firstOrNull()
+        prefs(c).edit().putString("autoFast", fast ?: pro ?: "").putString("autoPro", pro ?: fast ?: "")
+            .putString("autoFastList", (fastList.take(4) + "gemini-flash-latest").distinct().joinToString(","))
+            .putString("autoProList", (proList.take(2) + fastList.take(2) + "gemini-pro-latest").distinct().joinToString(","))
+            .putLong("autoAt", System.currentTimeMillis()).apply()
     }
 
     /** 2.5 models ke liye thinking budget: Fast=0 (pro mein band nahi hota), Smart=-1 (auto), Pro=default. null = field mat bhejo. */
@@ -99,8 +111,9 @@ object ProEngine {
         code == 400 && txt.contains("API key", true) -> "API key galat hai (Settings mein check karo)."
         code == 401 || code == 403 -> "API key reject hui ya permission nahi ($code)."
         code == 404 -> "Model '$model' nahi mila. Pro Chat ⚙ mein model ID khali chhod do (auto chunega)."
+        code == 503 || code == 500 -> "Google ka model '$model' abhi busy hai (high demand), dusre models bhi try kiye. 1-2 minute baad dobara bhejo."
         code == 429 -> "API limit/quota khatam (free key mein ~10 requests/min hoti hain). Thodi der baad try karo ya Project mode ki parallel files kam karo (⚙)."
-        else -> "API error $code: ${txt.take(160)}"
+        else -> "API error $code: ${(try { JSONObject(txt).optJSONObject("error")?.optString("message").orEmpty() } catch (_: Exception) { "" }).ifBlank { txt }.take(160)}"
     })
 
     private fun body(system: String, contents: JSONArray, think: Int?, json: Boolean, web: Boolean, maxOut: Int, temp: Double): String {
@@ -131,10 +144,12 @@ object ProEngine {
         var model = modelFor(c, mode)
         var think = thinkFor(model, mode)
         var rediscovered = false
+        val triedM = HashSet<String>().apply { add(model) }
         val sb = StringBuilder()
         var tries = 0
         while (true) {
             if (cancel.get()) return sb.toString()
+            lastModel = model
             val req = Request.Builder()
                 .url("https://generativelanguage.googleapis.com/v1beta/models/$model:streamGenerateContent?alt=sse")
                 .header("x-goog-api-key", k)
@@ -151,7 +166,13 @@ object ProEngine {
                             if (nm != model) { model = nm; think = thinkFor(nm, mode); retryWait = 0; return@use }
                         }
                         if (r.code == 400 && think != null) { think = null; retryWait = 0; return@use }
-                        if ((r.code == 429 || r.code >= 500) && tries < 3 && sb.isEmpty()) { retryWait = if (r.code == 429) 4000L * (tries + 1) else 1500L; return@use }
+                        if ((r.code == 429 || r.code >= 500) && sb.isEmpty()) {
+                            if (tries >= 1) {
+                                val fb = fallbackModel(c, triedM, mode == 2)
+                                if (fb != null) { triedM.add(fb); model = fb; think = thinkFor(fb, mode); tries = 0; retryWait = 0; return@use }
+                            }
+                            if (tries < 3) { retryWait = if (r.code == 429) 4000L * (tries + 1) else 1500L; return@use }
+                        }
                         throw err(r.code, t, model)
                     }
                     val src = r.body!!.source()
@@ -181,6 +202,7 @@ object ProEngine {
         val k = key(c); if (k.isBlank()) throw ApiError("Gemini API key nahi hai. Settings mein daalo.")
         var model = modelIn
         var rediscovered = false
+        val triedM = HashSet<String>().apply { add(model) }
         var think = thinkBudget
         val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", user))))
         var tries = 0
@@ -207,7 +229,13 @@ object ProEngine {
                         if (nm != model) { model = nm; if (think != null) think = if (nm.contains("2.5")) think else -2; wait = 0; return@use }
                     }
                     if (r.code == 400 && think != null) { think = null; wait = 0; return@use }
-                    if ((r.code == 429 || r.code >= 500) && tries < 4) { wait = if (r.code == 429) 5000L * (tries + 1) else 1500L; return@use }
+                    if (r.code == 429 || r.code >= 500) {
+                        if (tries >= 1) {
+                            val fb = fallbackModel(c, triedM, model.contains("pro"))
+                            if (fb != null) { triedM.add(fb); model = fb; if (think != null) think = if (fb.contains("2.5")) think else -2; tries = 0; wait = 0; return@use }
+                        }
+                        if (tries < 4) { wait = if (r.code == 429) 5000L * (tries + 1) else 1500L; return@use }
+                    }
                     throw err(r.code, txt, model)
                 }
             } catch (e: java.io.IOException) {

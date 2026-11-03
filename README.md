@@ -137,3 +137,8 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - **File upload:** ab rejection ka asli karan toast mein dikhta hai. **ZIP bhi upload hoti hai** (text/code padhi jati hai; binary, .git, build skip).
 - **🔄 Updated ZIP (khud ko update karwana):** apna project ZIP attach karo, bolo "ye badlav karo". Divya badli files poore path ke saath deti hai; jawab ke neeche **🔄 Updated ZIP** dabao -> original ZIP + badli/nayi files = naya ZIP Downloads mein. Build aur install aapko Android Studio se karna hoga.
 - Screen-share button ab Pro Chat header par nahi aata (settings icon ke upar aa raha tha).
+
+## v2.4.3 - 503 "high demand" fix
+- Google ka model busy (503/500) ya limit (429) ho to app pehle 1 baar wait karke dobara try karti hai, phir **khud agle model par switch** karti hai (3.8 flash -> 3.6 flash -> flash-lite -> flash-latest...). Pro Chat header mein "v2.4.3 • model-naam" dikhta hai ki abhi kaunsa model chala.
+- Error ab saaf Hinglish mein (raw JSON nahi).
+- GitHub workflow: naya ZIP upload karte hi source apne aap update hota hai (`.restored` marker se pata chalta hai ki ye ZIP pehle khula ya nahi).

@@ -64,6 +64,7 @@ object ProState {
     var mode by mutableStateOf(0)                    // 0 Fast, 1 Smart, 2 Pro
     var web by mutableStateOf(false)
     var projectMode by mutableStateOf(false)
+    var usedModel by mutableStateOf("")
     private val cancel = AtomicBoolean(false)
     private val main = Handler(Looper.getMainLooper())
     private var loaded = false
@@ -179,7 +180,7 @@ object ProState {
                 val msg = if (cancel.get()) "(rok diya)" else "⚠️ ${e.message}"
                 main.post { m.text = if (m.text.isBlank() || m.text.startsWith("⚠️")) msg else m.text + "\n\n" + msg }
             } finally {
-                main.post { m.busy = false; m.status = ""; busy = false; save(ctx) }
+                main.post { m.busy = false; m.status = ""; busy = false; usedModel = ProEngine.lastModel; save(ctx) }
             }
         }.start()
     }
@@ -375,7 +376,7 @@ fun ProChatScreen(th: UiTheme, openCode: () -> Unit) {
             val ver = remember { try { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "" } catch (_: Exception) { "" } }
             Column(Modifier.weight(1f)) {
                 Text("Divya Pro Chat", color = th.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("v$ver", color = th.text.copy(alpha = 0.5f), fontSize = 10.sp)
+                Text("v$ver" + (if (ProState.usedModel.isNotBlank()) "  •  ${ProState.usedModel}" else ""), color = th.text.copy(alpha = 0.5f), fontSize = 10.sp)
             }
             IconButton({ ProState.newChat(ctx); input = ""; atts.clear() }) { Icon(Icons.Filled.Add, "Nayi chat", tint = th.accent) }
             IconButton({ showCfg = true }) { Icon(Icons.Filled.Settings, "Settings", tint = th.accent) }
