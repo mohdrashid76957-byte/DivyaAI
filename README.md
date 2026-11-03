@@ -142,3 +142,7 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - Google ka model busy (503/500) ya limit (429) ho to app pehle 1 baar wait karke dobara try karti hai, phir **khud agle model par switch** karti hai (3.8 flash -> 3.6 flash -> flash-lite -> flash-latest...). Pro Chat header mein "v2.4.3 • model-naam" dikhta hai ki abhi kaunsa model chala.
 - Error ab saaf Hinglish mein (raw JSON nahi).
 - GitHub workflow: naya ZIP upload karte hi source apne aap update hota hai (`.restored` marker se pata chalta hai ki ye ZIP pehle khula ya nahi).
+
+## v2.4.4 - Models test
+- Pro Chat > ⚙ > **🔍 Models test**: saare candidate Gemini models ko "hi" bhej kar dikhata hai kaun sa abhi chal raha hai (✅ OK / ❌ 503 busy / 429 limit / 404). ✅ wale par tap = wahi Fast model (Save dabao).
+- 503 error mein ab try kiye gaye saare models ke naam dikhte hain.

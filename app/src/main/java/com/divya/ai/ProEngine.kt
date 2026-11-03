@@ -49,6 +49,36 @@ object ProEngine {
         return v.ifBlank { if (pro) "gemini-pro-latest" else "gemini-flash-latest" }
     }
 
+    private fun ping(k: String, model: String): String = try {
+        val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", "hi"))))
+        val req = Request.Builder().url("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent")
+            .header("x-goog-api-key", k).post(body("Reply with: ok", contents, null, false, false, 16, 0.2).toRequestBody("application/json".toMediaType())).build()
+        http.newBuilder().readTimeout(20, TimeUnit.SECONDS).build().newCall(req).execute().use { r ->
+            when {
+                r.isSuccessful -> "OK"
+                r.code == 503 -> "503 busy"
+                r.code == 429 -> "429 limit"
+                r.code == 404 -> "404 nahi mila"
+                else -> "error ${r.code}"
+            }
+        }
+    } catch (e: Exception) { "error: " + (e.message ?: "").take(40) }
+
+    /** Sab candidate models ko 'hi' bhej kar dekho kaun sa abhi chal raha hai. */
+    fun diagnose(c: Context): List<Pair<String, String>> {
+        val k = key(c); if (k.isBlank()) return listOf("API key" to "Settings mein daalo")
+        prefs(c).edit().remove("autoAt").apply()
+        try { discover(c) } catch (e: Exception) { return listOf("Model list" to "fail: ${(e.message ?: "").take(60)}") }
+        val p = prefs(c)
+        val all = ((p.getString("autoFastList", "") ?: "") + "," + (p.getString("autoProList", "") ?: "")).split(",").filter { it.isNotBlank() }.distinct().take(8)
+        if (all.isEmpty()) return listOf("Model list" to "khali (key ya internet check karo)")
+        val pool = Executors.newFixedThreadPool(4)
+        val fs = all.map { m -> pool.submit(java.util.concurrent.Callable { m to ping(k, m) }) }
+        val res = fs.map { try { it.get() } catch (e: Exception) { "?" to "error" } }
+        pool.shutdown()
+        return res
+    }
+
     /** Model busy (503/429) ho to agla model (jo abhi try nahi hua). */
     fun fallbackModel(c: Context, tried: Set<String>, pro: Boolean): String? {
         val l = (prefs(c).getString(if (pro) "autoProList" else "autoFastList", "") ?: "").split(",").filter { it.isNotBlank() }
@@ -107,11 +137,11 @@ object ProEngine {
         "For very big projects tell the user they can tap the 📦 Project button to get a full ZIP generated in parallel. " +
         "Add short run instructions (Termux / Android Studio / PC) after code. Never claim you ran code that you did not run. Keep non-coding answers concise and friendly."
 
-    private fun err(code: Int, txt: String, model: String): ApiError = ApiError(when {
+    private fun err(code: Int, txt: String, model: String, tried: Collection<String> = emptyList()): ApiError = ApiError(when {
         code == 400 && txt.contains("API key", true) -> "API key galat hai (Settings mein check karo)."
         code == 401 || code == 403 -> "API key reject hui ya permission nahi ($code)."
         code == 404 -> "Model '$model' nahi mila. Pro Chat ⚙ mein model ID khali chhod do (auto chunega)."
-        code == 503 || code == 500 -> "Google ka model '$model' abhi busy hai (high demand), dusre models bhi try kiye. 1-2 minute baad dobara bhejo."
+        code == 503 || code == 500 -> "Google ke models abhi busy hain (high demand). Try kiye: ${(tried + model).distinct().joinToString()}. ⚙ > '🔍 Models test' se dekho kaun sa chal raha hai, ya 1-2 minute baad dobara bhejo."
         code == 429 -> "API limit/quota khatam (free key mein ~10 requests/min hoti hain). Thodi der baad try karo ya Project mode ki parallel files kam karo (⚙)."
         else -> "API error $code: ${(try { JSONObject(txt).optJSONObject("error")?.optString("message").orEmpty() } catch (_: Exception) { "" }).ifBlank { txt }.take(160)}"
     })
@@ -173,7 +203,7 @@ object ProEngine {
                             }
                             if (tries < 3) { retryWait = if (r.code == 429) 4000L * (tries + 1) else 1500L; return@use }
                         }
-                        throw err(r.code, t, model)
+                        throw err(r.code, t, model, triedM)
                     }
                     val src = r.body!!.source()
                     while (!cancel.get()) {
@@ -236,7 +266,7 @@ object ProEngine {
                         }
                         if (tries < 4) { wait = if (r.code == 429) 5000L * (tries + 1) else 1500L; return@use }
                     }
-                    throw err(r.code, txt, model)
+                    throw err(r.code, txt, model, triedM)
                 }
             } catch (e: java.io.IOException) {
                 if (cancel.get()) throw ApiError("Cancel kiya")

@@ -481,7 +481,18 @@ fun ProChatScreen(th: UiTheme, openCode: () -> Unit) {
                     placeholder = { Text(prefs.getString("autoFast", "")?.ifBlank { "auto" } ?: "auto") })
                 OutlinedTextField(pm, { pm = it }, label = { Text("Pro model ID (khali = auto)") }, singleLine = true,
                     placeholder = { Text(prefs.getString("autoPro", "")?.ifBlank { "auto" } ?: "auto") })
-                TextButton({ prefs.edit().remove("autoAt").apply(); Toast.makeText(ctx, "Agli baar naya model dobara chunega", Toast.LENGTH_SHORT).show() }) { Text("🔄 Model dobara dhundo") }
+                var diag by remember { mutableStateOf<List<Pair<String, String>>?>(null) }
+                var diagBusy by remember { mutableStateOf(false) }
+                TextButton({
+                    if (!diagBusy) { diagBusy = true; diag = null
+                        Thread { val r = ProEngine.diagnose(ctx); main.post { diag = r; diagBusy = false } }.start() }
+                }) { Text(if (diagBusy) "Test chal raha hai… (10-20 sec)" else "🔍 Models test (kaun sa chal raha hai)") }
+                diag?.forEach { (m, st) ->
+                    TextButton({ if (st == "OK") { fm = m; Toast.makeText(ctx, "Fast model: $m - Save dabao", Toast.LENGTH_LONG).show() } }) {
+                        Text((if (st == "OK") "✅ " else "❌ ") + m + "  →  " + st, fontSize = 12.sp)
+                    }
+                }
+                if (diag != null) Text("✅ wale model par tap karo to wahi Fast model ban jayega (phir Save).", fontSize = 11.sp)
                 OutlinedTextField(cu, { cu = it }, label = { Text("Custom instructions (optional)") }, minLines = 2, maxLines = 5)
                 Text("Project mode parallel files: ${cc.toInt()}", fontSize = 13.sp)
                 Slider(cc, { cc = it }, valueRange = 1f..8f, steps = 6)
