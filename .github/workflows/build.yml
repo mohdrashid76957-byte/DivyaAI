@@ -14,19 +14,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Project restore (ZIP se)
+      - name: Naya ZIP ho to project update karo
         run: |
-          if [ ! -f settings.gradle.kts ]; then
-            Z=$(ls *.zip | sort -V | tail -1)
+          Z=$(ls *.zip 2>/dev/null | sort -V | tail -1)
+          if [ -n "$Z" ] && [ "$(cat .restored 2>/dev/null)" != "$Z" ]; then
             echo "Restoring from: $Z"
             mkdir _x && unzip -q "$Z" -d _x
             if [ "$(ls _x | wc -l)" = "1" ] && [ -d "_x/$(ls _x)" ]; then cp -a _x/*/. . ; else cp -a _x/. . ; fi
             rm -rf _x
+            echo "$Z" > .restored
             git config user.name "divya-bot"
             git config user.email "divya-bot@users.noreply.github.com"
             git add -A
-            git commit -m "Restore project from $Z" || true
+            git commit -m "Update project from $Z" || true
             git push || true
+          else
+            echo "ZIP naya nahi hai, source jaisa hai waisa hi"
           fi
 
       - uses: actions/setup-java@v4
