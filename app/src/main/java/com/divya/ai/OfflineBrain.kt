@@ -10,6 +10,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,6 +18,8 @@ import android.provider.AlarmClock
 import android.provider.ContactsContract
 import android.provider.Settings
 import android.speech.RecognitionListener
+import android.speech.RecognitionSupport
+import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
@@ -75,8 +78,13 @@ class OfflineBrain(
     private var doneCb: (() -> Unit)? = null
     private var uid = 0
     private var errs = 0
-    private val langs = listOf("hi-IN", "en-IN", "en-US")
+    private var langs = listOf("hi-IN", "en-IN", "en-US")
     private var langIdx = 0
+    private var mode = 1                 // 0 = on-device (Android 13+), 1 = Google recognizer, 2 = phone ka default
+    private var lsn = 0                  // har listen() ka token, purane callbacks ignore karne ke liye
+    private var noMatch = 0
+    private var lastRmsUi = 0L
+    private val modeName get() = when (mode) { 0 -> "on-device"; 1 -> "google"; else -> "default" }
     private var lastHeard = 0L
     private var torch = false
     private var lastReply = ""
@@ -93,6 +101,8 @@ class OfflineBrain(
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) { onStatus("Is phone mein speech recognition nahi hai"); return }
         active = true; WakeBus.liveActive = true; lastHeard = now(); errs = 0
         langIdx = p.getInt("offLangIdx", 0).coerceIn(0, langs.size - 1)
+        mode = p.getInt("offMode", if (Build.VERSION.SDK_INT >= 33) 0 else 1).coerceIn(0, 2); noMatch = 0
+        if (Build.VERSION.SDK_INT >= 33) probeLangs()
         val greet = "Offline mode chalu. Boliye ${name()}."
         if (tts == null) {
             tts = TextToSpeech(ctx.applicationContext) { st ->
@@ -151,46 +161,120 @@ class OfflineBrain(
         h.postDelayed({ if (speaking && my == uid) finishSpeak() }, 8000L + text.length * 90L)   // TTS atak jaye to bhi aage badho
     }
 
+    /** Android 13+: phone mein kaunsi offline languages installed hain, wo pooch kar sirf unhi ko try karo. */
+    @androidx.annotation.RequiresApi(33)
+    private fun probeLangs() {
+        try {
+            if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(ctx)) { if (mode == 0) mode = 1; return }
+            val pr = SpeechRecognizer.createOnDeviceSpeechRecognizer(ctx)
+            val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            pr.checkRecognitionSupport(i, ctx.mainExecutor, object : RecognitionSupportCallback {
+                override fun onSupportResult(rs: RecognitionSupport) {
+                    val inst = rs.installedOnDeviceLanguages
+                    try { pr.destroy() } catch (_: Exception) {}
+                    if (!active) return
+                    if (inst.isEmpty()) { if (mode == 0) mode = 1; return }
+                    val pref = listOf("hi-IN", "en-IN", "en-US")
+                    val picked = pref.filter { c -> inst.any { it.equals(c, true) } } +
+                        inst.filter { l -> l.startsWith("en", true) || l.startsWith("hi", true) }.filter { l -> pref.none { it.equals(l, true) } }
+                    langs = if (picked.isNotEmpty()) picked else inst.toList()
+                    langIdx = 0
+                }
+                override fun onError(error: Int) { try { pr.destroy() } catch (_: Exception) {}; if (mode == 0) mode = 1 }
+            })
+        } catch (_: Throwable) { if (mode == 0) mode = 1 }
+    }
+
+    private fun newRecognizer(): SpeechRecognizer = when {
+        mode == 0 && Build.VERSION.SDK_INT >= 33 && SpeechRecognizer.isOnDeviceRecognitionAvailable(ctx) -> SpeechRecognizer.createOnDeviceSpeechRecognizer(ctx)
+        mode <= 1 -> makeRecognizer(ctx)
+        else -> SpeechRecognizer.createSpeechRecognizer(ctx)
+    }
+
+    private fun advanceMode(): Boolean { if (mode < 2) { mode++; langIdx = 0; noMatch = 0; return true }; return false }
+
     private fun listen() {
         if (!active || speaking) return
         if (now() - lastHeard > 40_000) { stop("Offline mode band (kuch suna nahi)"); return }
         try { sr?.destroy() } catch (_: Exception) {}
-        val r = makeRecognizer(ctx); sr = r
+        val my = ++lsn
+        var ready = false
+        var maxRms = 0f
+        val r = try { newRecognizer() } catch (e: Throwable) {
+            if (advanceMode()) h.postDelayed({ listen() }, 200) else stop("Recognizer nahi bana: ${e.message}")
+            return
+        }
+        sr = r
         r.setRecognitionListener(object : RecognitionListener {
             override fun onResults(b: Bundle?) {
-                if (!active) return
+                if (!active || my != lsn) return
                 val s = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
-                if (s.isEmpty()) { h.postDelayed({ listen() }, 200); return }
-                errs = 0; lastHeard = now(); p.edit().putInt("offLangIdx", langIdx).apply(); handle(s)
+                if (s.isEmpty()) { onStatus("Suna nahi, dobara boliye"); h.postDelayed({ listen() }, 200); return }
+                errs = 0; noMatch = 0; lastHeard = now()
+                p.edit().putInt("offLangIdx", langIdx).putInt("offMode", mode).apply()
+                handle(s)
             }
             override fun onError(e: Int) {
-                if (!active) return
+                if (!active || my != lsn) return
+                val tag = "(${langs[langIdx]} • $modeName • err $e)"
                 when (e) {
-                    // 12/13 = language/pack nahi, 1/2 = offline pack na hone par network maangta hai -> agli language try karo
-                    12, 13, SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
-                        if (langIdx < langs.size - 1) { langIdx++; h.postDelayed({ listen() }, 300) }
-                        else { langIdx = 0; stop("Offline voice pack nahi hai: Google app > Settings > Voice > Offline speech recognition mein English (India) ya Hindi download karo") }
-                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> stop("Mic permission do")
-                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> h.postDelayed({ listen() }, 1200)
-                    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> h.postDelayed({ listen() }, 200)
-                    else -> if (++errs >= 6) stop("Speech recognition chal nahi raha (error $e)") else h.postDelayed({ listen() }, 700)
+                    // 12/13 = language/pack nahi, 1/2 = offline pack na hone par network maangta hai
+                    12, 13, 1, 2 -> {
+                        if (langIdx < langs.size - 1) { langIdx++; onStatus("Pack nahi mila, ${langs[langIdx]} try kar rahi hoon"); h.postDelayed({ listen() }, 300) }
+                        else if (advanceMode()) { onStatus("$modeName recognizer try kar rahi hoon"); h.postDelayed({ listen() }, 300) }
+                        else { mode = 1; langIdx = 0; stop("Offline voice pack nahi hai: Google app > Settings > Voice > Offline speech recognition mein English (India) download karo $tag") }
+                    }
+                    9 -> stop("Mic permission do")
+                    8 -> h.postDelayed({ listen() }, 1200)
+                    7, 6 -> {
+                        noMatch++
+                        val heard = maxRms > 3f
+                        if (!ready) { if (advanceMode()) onStatus("Recognizer ready nahi hua, $modeName par ja rahi hoon") else onStatus("Recognizer ready nahi hua $tag") }
+                        else if (!heard && noMatch >= 3) onStatus("Mic mein awaaz nahi aa rahi (screen recorder/dusri app mic le rahi?) $tag")
+                        else if (heard && noMatch >= 2 && langIdx < langs.size - 1) { langIdx++; noMatch = 0; onStatus("Samajh nahi aaya, ${langs[langIdx]} try kar rahi hoon") }
+                        else onStatus("Suna nahi, dobara boliye $tag")
+                        h.postDelayed({ listen() }, 250)
+                    }
+                    3, 5, 11 -> {
+                        if (advanceMode()) { onStatus("Err $e, $modeName par ja rahi hoon"); h.postDelayed({ listen() }, 300) }
+                        else if (++errs >= 6) stop("Speech recognition chal nahi raha $tag") else { onStatus("Err $e $tag"); h.postDelayed({ listen() }, 700) }
+                    }
+                    else -> if (++errs >= 6) stop("Speech recognition chal nahi raha $tag") else { onStatus("Err $e $tag"); h.postDelayed({ listen() }, 700) }
                 }
             }
-            override fun onReadyForSpeech(p: Bundle?) {}
+            override fun onReadyForSpeech(p: Bundle?) { if (!active || my != lsn) return; ready = true; onStatus("🎙 Boliye… (${langs[langIdx]} • $modeName)") }
             override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(v: Float) {}
+            override fun onRmsChanged(v: Float) {
+                if (v > maxRms) maxRms = v
+                if (ready && v > 3f && now() - lastRmsUi > 500) { lastRmsUi = now(); onStatus("🎙 Sun rahi hoon… (${langs[langIdx]})") }
+            }
             override fun onBufferReceived(b: ByteArray?) {}
             override fun onEndOfSpeech() {}
-            override fun onPartialResults(b: Bundle?) {}
+            override fun onPartialResults(b: Bundle?) {
+                if (!active || my != lsn) return
+                val t = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                if (!t.isNullOrBlank()) onStatus("🎤 $t")
+            }
             override fun onEvent(t: Int, p: Bundle?) {}
         })
         val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, langs[langIdx])
+            .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-        onStatus("Offline: boliye… (${langs[langIdx]})")
+        onStatus("Offline: shuru ho rahi hoon… (${langs[langIdx]} • $modeName)")
         try { r.startListening(i) } catch (_: Exception) { h.postDelayed({ listen() }, 1000) }
+        // watchdog: 4 sec mein recognizer ready na ho to agle mode par
+        h.postDelayed({
+            if (active && my == lsn && !ready) {
+                try { r.cancel() } catch (_: Exception) {}
+                lsn++
+                if (advanceMode()) { onStatus("Recognizer jawab nahi de raha, $modeName par ja rahi hoon"); listen() }
+                else stop("Speech recognizer start nahi hua: Google app update/enable karo")
+            }
+        }, 4000)
     }
 
     private fun handle(s: String) {

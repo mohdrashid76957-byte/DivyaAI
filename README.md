@@ -170,3 +170,10 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - **Fix:** ab language chain chalti hai: hi-IN -> en-IN -> en-US. Jo chal jaye wahi yaad rakhti hai. Offline pack na hone par aane wale network error (1/2) bhi isi chain se handle hote hain.
 - **Google recognizer seedha:** Xiaomi/Redmi jaise phones ka default recognizer offline Hindi nahi chalata, ab Google ka recognizer pehle chuna jata hai (OfflineBrain + WakeService dono).
 - **Manifest:** `<queries>` mein RecognitionService + Google app joda (Android 11+ package visibility).
+
+## v2.6.1 (update 2) - Offline sunna nahi chal raha tha, ab self-diagnose
+- **Problem (video se):** hi-IN/en-IN se fallback hokar en-US tak pahunchta tha, phir status "Offline: boliye... (en-US)" par atak jata tha, bolne par kuch nahi hota tha aur app kuch bata bhi nahi rahi thi.
+- **3 recognizer modes:** on-device (Android 13+) -> Google -> phone ka default. Recognizer 4 sec mein ready na ho ya error 3/5/11 aaye to khud agle mode par jata hai; jo chal jaye wahi yaad rakhta hai.
+- **Android 13+:** phone se pooch leta hai ki kaunsi offline languages installed hain aur sirf unhi ko try karta hai.
+- **Screen par live feedback:** "Boliye (lang * mode)", bolte waqt "Sun rahi hoon", beech mein jo samjha wo text, aur error aaye to code ke saath (err N). Mic mein awaaz hi na aaye to alag message.
+- Awaaz aayi par samajh na aaye to agli language par chali jati hai.
