@@ -53,8 +53,47 @@ class DivyaNotifListener : NotificationListenerService() {
         }
     }
 
+    /** Screen on hone par time ke hisaab se greeting; subah pehli baar briefing (date, battery, notifications). */
+    private val greetRx = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) {
+            if (i.action != Intent.ACTION_SCREEN_ON) return
+            val p = c.getSharedPreferences("divya", 0)
+            if (!p.getBoolean("annGreet", true)) return
+            val now = System.currentTimeMillis()
+            if (now - p.getLong("lastGreet", 0L) < 3 * 3600_000L) return   // 3 ghante mein ek baar
+            p.edit().putLong("lastGreet", now).apply()
+
+            val cal = java.util.Calendar.getInstance()
+            val h = cal.get(java.util.Calendar.HOUR_OF_DAY)
+            val part = when { h < 12 -> "Good morning"; h < 17 -> "Good afternoon"; else -> "Good evening" }
+            val who = (p.getString("annName", "Rashid sir") ?: "").ifBlank { "Sir" }
+            val sb = StringBuilder("$part, $who.")
+
+            val today = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date(now))
+            if (h < 12 && p.getString("briefDay", "") != today) {
+                p.edit().putString("briefDay", today).apply()
+                val date = java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.ENGLISH).format(java.util.Date(now))
+                sb.append(" Aaj $date hai.")
+                val lvl = try { c.getSystemService(BatteryManager::class.java)?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1 } catch (_: Exception) { -1 }
+                if (lvl >= 0) sb.append(" Battery $lvl percent hai.")
+                val n = try { this@DivyaNotifListener.activeNotifications?.count { it.packageName != c.packageName && !it.isOngoing } ?: 0 } catch (_: Exception) { 0 }
+                sb.append(if (n > 0) " Aapke paas $n notification hain." else " Koi nayi notification nahi hai.")
+            }
+            Announcer.speak(c, sb.toString())
+        }
+    }
+
+    private fun registerGreet() {
+        try {
+            val f = IntentFilter(Intent.ACTION_SCREEN_ON)
+            if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(greetRx, f, Context.RECEIVER_NOT_EXPORTED)
+            else registerReceiver(greetRx, f)
+        } catch (_: Exception) {}
+    }
+
     override fun onCreate() {
         super.onCreate()
+        registerGreet()
         val f = IntentFilter().apply {
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
@@ -68,6 +107,7 @@ class DivyaNotifListener : NotificationListenerService() {
 
     override fun onDestroy() {
         try { unregisterReceiver(powerRx) } catch (_: Exception) {}
+        try { unregisterReceiver(greetRx) } catch (_: Exception) {}
         super.onDestroy()
     }
 

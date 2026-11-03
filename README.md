@@ -225,3 +225,9 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 ## v2.12.0 - Low battery + missed call announcements
 - **Low battery:** battery kam hone par "Battery kam hai, charger laga do" (Settings > Announcements > Battery kam ho to bolo).
 - **Missed call:** missed call aaye to "Rashid sir, [naam] ki missed call aayi hai" (Settings > Missed call aaye to bolo).
+
+## v2.13.0 - Screen on greeting + subah ka briefing
+- **Greeting:** screen on hone par time ke hisaab se "Good morning / afternoon / evening, Rashid sir." (3 ghante mein ek baar).
+- **Subah ka briefing:** din ki pehli baar subah (12 baje se pehle) screen on hone par date, battery aur notifications ki ginti bolti hai.
+- Settings > Announcements > "Screen on par greeting aur subah ka briefing" se ON/OFF.
+- Mausam aur calendar abhi nahi (mausam ke liye API key, calendar ke liye alag permission chahiye).
