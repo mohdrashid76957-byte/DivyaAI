@@ -156,3 +156,11 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - Offline commands: app kholo, call (naam/number), call uthao/kaato/speaker, time, date, battery, torch, volume, alarm, timer, Wi-Fi/Bluetooth settings, home/back/recents/lock/screenshot/scroll, notifications padho.
 - Pehli baar: Google app > Settings > Voice > Offline speech recognition mein Hindi + English download karo.
 - Voice Lock ON ho to offline mein sirf basic kaam (time, battery, torch, volume) chalte hain. Naya file: OfflineBrain.kt.
+
+## v2.6.0 - Offline mode advanced
+- SMS (SIM se, internet nahi): "Ammi ko message bhejo main aa raha hoon" (Accessibility ON ho to Send bhi khud dabati hai).
+- Hindi mein bola naam bhi English mein save contact se milta hai (jaise अम्मी -> Ammi), thoda galat bolne par bhi.
+- Music control: gaana pause/play/next/pichla. Silent/vibrate/normal mode.
+- Yaad dilana ("10 minute baad yaad dilana chai banani hai"), notes (note likho / notes padho / notes hata do), calculator ("12 guna 4", "20 percent of 300").
+- Screen padho ("screen par kya hai"), settings pages (location, display, battery, storage...), chutkula, "dobara bolo".
+- Naye sawal ka jawab agle bol mein ("Kisko call karna hai?" -> "Ammi").
