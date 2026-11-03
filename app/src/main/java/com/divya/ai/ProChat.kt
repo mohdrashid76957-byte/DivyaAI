@@ -150,6 +150,16 @@ object ProState {
         val hist = msgs.toList().dropLast(1)
         val md = mode; val wb = web
         val ctx = c.applicationContext
+        // Intezaar ke dauran seconds + model ka naam dikhao (taaki pata chale atka nahi hai)
+        val t0 = System.currentTimeMillis()
+        val tick = object : Runnable {
+            override fun run() {
+                if (!m.busy) return
+                if (!project) m.status = if (m.text.isBlank()) "soch rahi hoon… ${(System.currentTimeMillis() - t0) / 1000}s • ${ProEngine.lastModel}" else ""
+                main.postDelayed(this, 1000)
+            }
+        }
+        main.postDelayed(tick, 1000)
         Thread {
             try {
                 if (project) {

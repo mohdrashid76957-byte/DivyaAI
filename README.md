@@ -146,3 +146,7 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 ## v2.4.4 - Models test
 - Pro Chat > ⚙ > **🔍 Models test**: saare candidate Gemini models ko "hi" bhej kar dikhata hai kaun sa abhi chal raha hai (✅ OK / ❌ 503 busy / 429 limit / 404). ✅ wale par tap = wahi Fast model (Save dabao).
 - 503 error mein ab try kiye gaye saare models ke naam dikhte hain.
+
+## v2.4.5 - "soch rahi hoon" atakna fix
+- Model busy hone par connection khol kar chup baith jata tha aur app bina timeout ke ruki rehti thi. Ab jawab ka pehla hissa 25 sec (Smart 45, Pro 90) mein na aaye to app khud agle model par chali jati hai (project files ke liye 120 sec).
+- Intezaar ke dauran "soch rahi hoon… 12s • model-naam" dikhta hai. Stop button se kabhi bhi roka ja sakta hai.

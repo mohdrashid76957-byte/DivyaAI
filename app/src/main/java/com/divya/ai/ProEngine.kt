@@ -184,7 +184,8 @@ object ProEngine {
                 .url("https://generativelanguage.googleapis.com/v1beta/models/$model:streamGenerateContent?alt=sse")
                 .header("x-goog-api-key", k)
                 .post(body(system, contents, think, false, web, 32768, 0.6).toRequestBody("application/json".toMediaType())).build()
-            val call = http.newCall(req); curCall = call
+            // Pehle byte ka timeout: model chup baith jaye (busy) to hamesha mat ruko, agle model par jao
+            val call = http.newBuilder().readTimeout(when (mode) { 0 -> 25L; 1 -> 45L; else -> 90L }, TimeUnit.SECONDS).build().newCall(req); curCall = call
             var retryWait = -1L
             try {
                 call.execute().use { r ->
@@ -220,7 +221,11 @@ object ProEngine {
                 }
             } catch (e: java.io.IOException) {
                 if (cancel.get()) return sb.toString()
-                if (sb.isEmpty() && tries < 2) { retryWait = 1500 } else if (sb.isEmpty()) throw ApiError("Internet/timeout problem: ${e.message}") else return sb.toString()
+                if (sb.isNotEmpty()) return sb.toString()
+                val fb = if (tries >= 1 || e is java.net.SocketTimeoutException) fallbackModel(c, triedM, mode == 2) else null
+                if (fb != null) { triedM.add(fb); model = fb; think = thinkFor(fb, mode); tries = 0; retryWait = 0 }
+                else if (tries < 2) retryWait = 1500
+                else throw ApiError("Internet/timeout problem: ${e.message}")
             }
             if (retryWait >= 0) { tries++; try { Thread.sleep(retryWait) } catch (_: InterruptedException) {}; continue }
             return sb.toString()
@@ -238,13 +243,14 @@ object ProEngine {
         var tries = 0
         while (true) {
             if (cancel.get()) throw ApiError("Cancel kiya")
+            lastModel = model
             val req = Request.Builder()
                 .url("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent")
                 .header("x-goog-api-key", k)
                 .post(body(system, contents, think, json, false, maxOut, 0.4).toRequestBody("application/json".toMediaType())).build()
             var wait = -1L; var out: String? = null
             try {
-                val call = http.newCall(req); curCall = call
+                val call = http.newBuilder().readTimeout(120, TimeUnit.SECONDS).build().newCall(req); curCall = call
                 call.execute().use { r ->
                     val txt = r.body?.string().orEmpty()
                     if (r.isSuccessful) {
@@ -270,8 +276,10 @@ object ProEngine {
                 }
             } catch (e: java.io.IOException) {
                 if (cancel.get()) throw ApiError("Cancel kiya")
-                if (tries >= 2) throw ApiError("Internet/timeout problem: ${e.message}")
-                wait = 1500
+                val fb = if (tries >= 1 || e is java.net.SocketTimeoutException) fallbackModel(c, triedM, model.contains("pro")) else null
+                if (fb != null) { triedM.add(fb); model = fb; if (think != null) think = if (fb.contains("2.5")) think else -2; tries = 0; wait = 0 }
+                else if (tries >= 2) throw ApiError("Internet/timeout problem: ${e.message}")
+                else wait = 1500
             }
             out?.let { if (it.isBlank()) throw ApiError("Model ne khali jawab diya.") else return it }
             tries++; try { Thread.sleep(wait) } catch (_: InterruptedException) {}
