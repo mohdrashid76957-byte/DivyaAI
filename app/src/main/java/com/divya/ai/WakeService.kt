@@ -19,11 +19,16 @@ object WakeBus {
     @Volatile var liveActive = false          // Gemini session chal raha hai to wake listener ruka rahe (mic free rahe)
 }
 
-/** "Wake up Divya" / "Divya" sunne ke liye chhota foreground service (phone ki on-device speech recognition). */
+/**
+ * "Wake up Divya" / "Divya" sunne ke liye chhota foreground service (phone ki on-device speech recognition).
+ * v2.10.1: session chalne par mic poori tarah chhod deta hai, purane recognizer ke callbacks ignore hote hain,
+ * aur no-match par backoff badha hai taaki mic bar bar on/off na ho.
+ */
 class WakeService : Service() {
     private val h = Handler(Looper.getMainLooper())
     private var sr: SpeechRecognizer? = null
     private var dead = false
+    private var gen = 0                       // har naye recognizer ka id; purane ke callbacks ignore
     private val keys = listOf("divya", "दिव्या", "diviya", "divia", "deveya", "दिव्य")
 
     companion object {
@@ -47,24 +52,46 @@ class WakeService : Service() {
 
     private fun loop() {
         if (dead) return
-        if (WakeBus.liveActive || !micOk(this) || !SpeechRecognizer.isRecognitionAvailable(this)) { h.postDelayed({ loop() }, 1200); return }
+        // Gemini session chal raha ho to mic bilkul free: recognizer band, bas thodi der mein dobara check
+        if (WakeBus.liveActive) { releaseMic(); h.postDelayed({ loop() }, 1500); return }
+        if (!micOk(this) || !SpeechRecognizer.isRecognitionAvailable(this)) { h.postDelayed({ loop() }, 3000); return }
         listen()
     }
 
     private fun matches(t: String): Boolean { val s = t.lowercase(); return keys.any { s.contains(it) } }
 
-    private fun listen() {
+    /** Recognizer band karo aur purane callbacks ko invalid karo. */
+    private fun releaseMic() {
+        gen++
+        try { sr?.cancel() } catch (_: Exception) {}
         try { sr?.destroy() } catch (_: Exception) {}
+        sr = null
+    }
+
+    private fun listen() {
+        releaseMic()
+        val my = gen
         val r = makeRecognizer(this); sr = r
+        fun next(delay: Long) { if (!dead && my == gen) h.postDelayed({ loop() }, delay) }
         r.setRecognitionListener(object : RecognitionListener {
             fun check(b: Bundle?): Boolean {
+                if (my != gen || WakeBus.liveActive) return false   // session chal raha hai to wake mat karo
                 val l = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: return false
                 if (l.any { matches(it) }) { wake(); return true }
                 return false
             }
             override fun onPartialResults(b: Bundle?) { check(b) }
-            override fun onResults(b: Bundle?) { if (!check(b)) h.postDelayed({ loop() }, 150) }
-            override fun onError(e: Int) { h.postDelayed({ loop() }, if (e == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 1500 else 250) }
+            override fun onResults(b: Bundle?) { if (my == gen && !check(b)) next(800) }
+            override fun onError(e: Int) {
+                if (my != gen) return                           // purana recognizer (releaseMic ke baad) - ignore
+                val d = when (e) {
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 4000L
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> 15000L
+                    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> 1800L
+                    else -> 3000L
+                }
+                next(d)
+            }
             override fun onReadyForSpeech(p: Bundle?) {}
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(v: Float) {}
@@ -78,13 +105,12 @@ class WakeService : Service() {
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
             .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-        try { r.startListening(i) } catch (_: Exception) { h.postDelayed({ loop() }, 1000) }
+        try { r.startListening(i) } catch (_: Exception) { next(2000) }
     }
 
     private fun wake() {
-        try { sr?.cancel(); sr?.destroy() } catch (_: Exception) {}
-        sr = null
-        WakeBus.liveActive = true   // mic Gemini ko dene ke liye turant ruk jao
+        releaseMic()                                // wake hone par mic turant chhod do
+        WakeBus.liveActive = true
         WakeBus.req = true
         try {
             startActivity(Intent(this, MainActivity::class.java).putExtra("wake", true)
@@ -95,7 +121,7 @@ class WakeService : Service() {
 
     override fun onDestroy() {
         dead = true; h.removeCallbacksAndMessages(null)
-        try { sr?.destroy() } catch (_: Exception) {}
+        releaseMic()
         super.onDestroy()
     }
 }

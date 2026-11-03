@@ -206,3 +206,8 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - **Tile touch feel:** Neon home ki tiles dabane par halka spring sikudna, Maya jaisa smooth touch.
 - **Backup & restore (naya):** Settings > "Backup & restore" se yaadein (notes), Pro chats, scan history aur settings ek JSON file mein share karo. Dusre phone par "Backup file se restore karo". API key aur privacy password backup mein nahi jaate (security), naye phone par dobara daalne honge.
 - Version 2.10.0 (versionCode 26).
+
+## v2.10.1 - Background wake word mic fix
+- **Bug:** Background mein "Divya" sunne wala listener aur Gemini session ek hi mic ke liye lad rahe the, aur har recognizer cycle par mic on/off ho raha tha.
+- **Fix:** Session chalne par wake listener ka mic poora release hota hai. Purane recognizer ke callbacks ignore hote hain (double loop nahi). No-match par wait ~1.8 sec, aur session chal raha ho to wake trigger nahi hota.
+- Note: Android ka SpeechRecognizer har cycle mein mic kholta hai, isliye mic indicator kabhi-kabhi dikh sakta hai. Poori tarah band karne ke liye offline hotword engine (jaise Vosk ya Porcupine) chahiye.
