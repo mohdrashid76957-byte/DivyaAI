@@ -20,6 +20,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import android.content.Intent
+import androidx.compose.foundation.layout.fillMaxWidth as fmw
+import androidx.compose.material3.Checkbox
+import androidx.compose.ui.platform.LocalContext
 import java.util.Locale
 
 /** Background mein bolne ke liye chhota TTS (notification / call / charger announcements). */
@@ -63,6 +67,7 @@ fun AnnounceSettings(th: UiTheme, prefs: SharedPreferences) {
     AnnSwitch(th, "Battery kam ho to bolo", "annBattery", prefs)
     AnnSwitch(th, "Missed call aaye to bolo", "annMissed", prefs)
     AnnSwitch(th, "Screen on par greeting aur subah ka briefing", "annGreet", prefs)
+    AppPicker(th, prefs)
 }
 
 @Composable
@@ -71,5 +76,31 @@ private fun AnnSwitch(th: UiTheme, label: String, key: String, prefs: SharedPref
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = th.text, modifier = Modifier.weight(1f))
         Switch(on, { on = it; prefs.edit().putBoolean(key, it).apply() })
+    }
+}
+
+/** Kin apps ke notifications bolne hain. Koi tick na ho to sab apps. */
+@Composable
+fun AppPicker(th: UiTheme, prefs: SharedPreferences) {
+    val ctx = LocalContext.current
+    val apps = remember {
+        val pm = ctx.packageManager
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        pm.queryIntentActivities(launcher, 0)
+            .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+            .filter { it.first != ctx.packageName }
+            .distinctBy { it.first }
+            .sortedBy { it.second.lowercase() }
+    }
+    var sel by remember { mutableStateOf(prefs.getString("annApps", "")!!.split(",").filter { it.isNotBlank() }.toSet()) }
+    Text("Kin apps ke notifications bolun (koi nahi chuna = sab apps)", color = th.text, fontWeight = FontWeight.SemiBold)
+    apps.forEach { (pkg, label) ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = th.text, modifier = Modifier.weight(1f))
+            Checkbox(checked = pkg in sel, onCheckedChange = { c ->
+                sel = if (c) sel + pkg else sel - pkg
+                prefs.edit().putString("annApps", sel.joinToString(",")).apply()
+            })
+        }
     }
 }

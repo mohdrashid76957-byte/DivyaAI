@@ -36,6 +36,16 @@ class DivyaNotifListener : NotificationListenerService() {
     }
 
     private val seen = LinkedHashSet<String>()
+    private val recent = HashMap<String, java.util.ArrayDeque<Long>>()   // app ke haal ke announcements (rate limit)
+
+    /** Ek app se 1 minute mein 3 se zyada announcement nahi. */
+    private fun rateOk(pkg: String): Boolean {
+        val now = System.currentTimeMillis()
+        val q = recent.getOrPut(pkg) { java.util.ArrayDeque() }
+        while (q.isNotEmpty() && now - q.first() > 60_000L) q.removeFirst()
+        if (q.size >= 3) return false
+        q.addLast(now); return true
+    }
 
     private val powerRx = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
@@ -140,9 +150,25 @@ class DivyaNotifListener : NotificationListenerService() {
         if (!p.getBoolean("annNotif", true)) return
         if (n.isOngoing || (n.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
         if (title.isBlank() && text.isBlank()) return
+        // Baat ke beech mein mat bolo (Gemini session chal raha ho)
+        if (WakeBus.liveActive) return
+        // Silent / low-priority notifications nahi bolna
+        if (n.notification.priority < Notification.PRIORITY_DEFAULT) return
+        // Sirf chune hue apps (koi chuna nahi to sab)
+        val allowed = (p.getString("annApps", "") ?: "").split(",").filter { it.isNotBlank() }
+        if (allowed.isNotEmpty() && n.packageName !in allowed) return
+        if (!rateOk(n.packageName)) return
+
         val pm = packageManager
         val app = try { pm.getApplicationLabel(pm.getApplicationInfo(n.packageName, 0)).toString() } catch (_: Exception) { "" }
         val body = listOf(title, text.take(200)).filter { it.isNotBlank() }.joinToString(". ")
+        // OTP / verification code ka text nahi bolna, sirf batana ki code aaya hai
+        val looksOtp = Regex("\\b\\d{4,8}\\b").containsMatchIn(body) &&
+            listOf("otp", "code", "verification", "verify").any { body.contains(it, ignoreCase = true) }
+        if (looksOtp) {
+            Announcer.speak(this, (if (app.isBlank()) "" else "$app se ") + "OTP ya verification code aaya hai. Code nahi bolungi.")
+            return
+        }
         Announcer.speak(this, if (app.isBlank()) body else "$app se: $body")
     }
 

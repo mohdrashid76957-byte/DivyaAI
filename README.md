@@ -240,3 +240,11 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 
 ## v2.14.1 - Wake word debug logs
 - WakeService ab logcat mein "heard: ..." aur "error N" likhta hai (filter: WakeService). Recognizer busy (error 8) ho to message batata hai ki mic kisi aur app ke paas hai.
+
+## v2.15.0 - Messages aur notification settings (Maya jaisa)
+- **Apps chuno:** Settings > Announcements mein installed apps ki list; tick kiye apps ke notifications hi bolegi.
+- **Baat mein dakhal nahi:** Gemini session chal raha ho to notification announcements skip hongi.
+- **Silent / low-priority notifications** nahi bolegi.
+- **Rate limit:** ek app se 1 minute mein max 3 announcements.
+- **OTP safety:** OTP / verification code ka text nahi bolegi, sirf batayegi ki code aaya hai.
+- Abhi nahi: WhatsApp auto-reply (jawab khud dene ka risk) aur "koi na bole to so jao".
