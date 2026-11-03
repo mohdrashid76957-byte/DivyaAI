@@ -1,5 +1,6 @@
 package com.divya.ai
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.hardware.camera2.CameraCharacteristics
@@ -50,6 +51,14 @@ object Net {
  * Gemini nahi chalta, isliye sirf fixed commands samajhti hai (app kholo, call, time, battery, torch, volume, alarm, timer, phone buttons).
  * Sab callbacks main thread par aate hain.
  */
+
+/** Google ka recognizer seedha chunta hai (Xiaomi/Redmi jaise phones ka default recognizer offline Hindi nahi chalata). */
+fun makeRecognizer(ctx: Context): SpeechRecognizer {
+    val g = ComponentName("com.google.android.googlequicksearchbox", "com.google.android.voicesearch.serviceapi.GoogleRecognitionService")
+    val ok = try { ctx.packageManager.getServiceInfo(g, 0); true } catch (_: Exception) { false }
+    return if (ok) SpeechRecognizer.createSpeechRecognizer(ctx, g) else SpeechRecognizer.createSpeechRecognizer(ctx)
+}
+
 class OfflineBrain(
     private val ctx: Context,
     private val onStatus: (String) -> Unit,
@@ -66,6 +75,8 @@ class OfflineBrain(
     private var doneCb: (() -> Unit)? = null
     private var uid = 0
     private var errs = 0
+    private val langs = listOf("hi-IN", "en-IN", "en-US")
+    private var langIdx = 0
     private var lastHeard = 0L
     private var torch = false
     private var lastReply = ""
@@ -81,6 +92,7 @@ class OfflineBrain(
         if (!micOk(ctx)) { onStatus("Mic permission do"); return }
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) { onStatus("Is phone mein speech recognition nahi hai"); return }
         active = true; WakeBus.liveActive = true; lastHeard = now(); errs = 0
+        langIdx = p.getInt("offLangIdx", 0).coerceIn(0, langs.size - 1)
         val greet = "Offline mode chalu. Boliye ${name()}."
         if (tts == null) {
             tts = TextToSpeech(ctx.applicationContext) { st ->
@@ -143,18 +155,21 @@ class OfflineBrain(
         if (!active || speaking) return
         if (now() - lastHeard > 40_000) { stop("Offline mode band (kuch suna nahi)"); return }
         try { sr?.destroy() } catch (_: Exception) {}
-        val r = SpeechRecognizer.createSpeechRecognizer(ctx); sr = r
+        val r = makeRecognizer(ctx); sr = r
         r.setRecognitionListener(object : RecognitionListener {
             override fun onResults(b: Bundle?) {
                 if (!active) return
                 val s = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
                 if (s.isEmpty()) { h.postDelayed({ listen() }, 200); return }
-                errs = 0; lastHeard = now(); handle(s)
+                errs = 0; lastHeard = now(); p.edit().putInt("offLangIdx", langIdx).apply(); handle(s)
             }
             override fun onError(e: Int) {
                 if (!active) return
                 when (e) {
-                    12, 13 -> stop("Offline voice pack nahi hai: Google app > Settings > Voice > Offline speech recognition mein Hindi/English download karo")
+                    // 12/13 = language/pack nahi, 1/2 = offline pack na hone par network maangta hai -> agli language try karo
+                    12, 13, SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
+                        if (langIdx < langs.size - 1) { langIdx++; h.postDelayed({ listen() }, 300) }
+                        else { langIdx = 0; stop("Offline voice pack nahi hai: Google app > Settings > Voice > Offline speech recognition mein English (India) ya Hindi download karo") }
                     SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> stop("Mic permission do")
                     SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> h.postDelayed({ listen() }, 1200)
                     SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> h.postDelayed({ listen() }, 200)
@@ -171,10 +186,10 @@ class OfflineBrain(
         })
         val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, langs[langIdx])
             .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-        onStatus("Offline: boliye…")
+        onStatus("Offline: boliye… (${langs[langIdx]})")
         try { r.startListening(i) } catch (_: Exception) { h.postDelayed({ listen() }, 1000) }
     }
 

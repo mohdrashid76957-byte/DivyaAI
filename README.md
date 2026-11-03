@@ -164,3 +164,9 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - Yaad dilana ("10 minute baad yaad dilana chai banani hai"), notes (note likho / notes padho / notes hata do), calculator ("12 guna 4", "20 percent of 300").
 - Screen padho ("screen par kya hai"), settings pages (location, display, battery, storage...), chutkula, "dobara bolo".
 - Naye sawal ka jawab agle bol mein ("Kisko call karna hai?" -> "Ammi").
+
+## v2.6.1 - Offline voice fix
+- **Bug:** offline mode mein mic dabate hi "Offline voice pack nahi hai" aakar band ho jata tha. Sirf Hindi (hi-IN) try hota tha aur error 12/13 par turant stop.
+- **Fix:** ab language chain chalti hai: hi-IN -> en-IN -> en-US. Jo chal jaye wahi yaad rakhti hai. Offline pack na hone par aane wale network error (1/2) bhi isi chain se handle hote hain.
+- **Google recognizer seedha:** Xiaomi/Redmi jaise phones ka default recognizer offline Hindi nahi chalata, ab Google ka recognizer pehle chuna jata hai (OfflineBrain + WakeService dono).
+- **Manifest:** `<queries>` mein RecognitionService + Google app joda (Android 11+ package visibility).

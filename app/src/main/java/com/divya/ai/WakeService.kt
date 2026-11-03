@@ -54,7 +54,7 @@ class WakeService : Service() {
 
     private fun listen() {
         try { sr?.destroy() } catch (_: Exception) {}
-        val r = SpeechRecognizer.createSpeechRecognizer(this); sr = r
+        val r = makeRecognizer(this); sr = r
         r.setRecognitionListener(object : RecognitionListener {
             fun check(b: Bundle?): Boolean {
                 val l = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: return false
