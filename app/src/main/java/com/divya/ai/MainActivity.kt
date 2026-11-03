@@ -59,7 +59,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
-enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, Journal, Study, Scan, About, Code, Preview, Guardian, Backup }
+enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, Journal, Study, Scan, About, Code, Preview, Guardian, Backup, ProChat }
 
 class UiTheme(
     val name: String, val img: Int, val circle: Boolean, val bg: Brush, val text: Color, val accent: Color,
@@ -225,8 +225,12 @@ fun DivyaApp(ctx: Context) {
     val tapMic = { if (micOk(ctx)) toggle() else micLauncher.launch(Manifest.permission.RECORD_AUDIO) }
     fun sendChat(t: String) {
         msgs.add("You" to t)
+        val offlineNow = !Net.online(ctx) || prefs.getBoolean("offlineOnly", false)
         if (live.running) live.sendText(t)
-        else if (key().isBlank()) { status = "API key missing"; screen = Screen.Settings }
+        else if (offlineNow || key().isBlank()) {
+            // Internet/API key nahi: Offline smart brain typed sawaal ka jawab deti hai
+            off.askText(t) { r -> msgs.add("Divya" to r) }
+        }
         else { live.gfMode = prefs.getBoolean("gf", true); live.callName = prefs.getString("call", "Sir") ?: "Sir"; live.start(key(), model(), voice(), false, t) }
     }
 
@@ -285,9 +289,10 @@ fun DivyaApp(ctx: Context) {
                     themeIdx = next; prefs.edit().putInt("theme2", next).apply()
                     android.widget.Toast.makeText(ctx, "Avatar: " + themes[next].name, android.widget.Toast.LENGTH_SHORT).show()
                 }) { screen = it }
-                    else if (th.maya) HomeMaya(th, status, micNow, prefs, { screen = it }) { t -> ProBus.pending = t; screen = Screen.Chat }
+                    else if (th.maya) HomeMaya(th, status, micNow, prefs, { screen = it }) { t -> sendChat(t); screen = Screen.Chat }
                     else Home(th, status, micNow, tapMic) { screen = Screen.Chat }
-                Screen.Chat -> ProChatScreen(th) { screen = Screen.Code }
+                Screen.Chat -> ChatScreen(th, msgs, !(!Net.online(ctx) || prefs.getBoolean("offlineOnly", false)) && key().isNotBlank(), { sendChat(it) }) { screen = Screen.ProChat }
+                Screen.ProChat -> ProChatScreen(th) { screen = Screen.Code }
                 Screen.Journal -> JournalScreen(th, prefs)
                 Screen.Study -> StudyScreen(th)
                 Screen.Apps -> AppsScreen(th, ctx)
@@ -318,7 +323,7 @@ fun DivyaApp(ctx: Context) {
     }
     if (glowOn) GlowBorder(if (micNow) Color(0xFF00FF40) else th.accent, micNow)
     // Live screen sharing ka chhota button (session chalu hone par dikhta hai). ON hone par Divya aapki screen dekhti rehti hai.
-    if (live.running && screen != Screen.Scan && screen != Screen.Chat) {
+    if (live.running && screen != Screen.Scan && screen != Screen.Chat && screen != Screen.ProChat) {
         Box(Modifier.align(Alignment.TopEnd).systemBarsPadding().padding(top = 4.dp, end = 10.dp)
             .clip(RoundedCornerShape(50)).background(if (live.screenShare) Color(0xFFE53935) else Color(0xAA000000))
             .clickable {
@@ -426,10 +431,19 @@ fun Btn(th: UiTheme, label: String, onClick: () -> Unit) =
     Button(onClick, Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = th.accent)) { Text(label, color = Color.White) }
 
 @Composable
-fun ChatScreen(th: UiTheme, msgs: List<Pair<String, String>>, send: (String) -> Unit) {
+fun ChatScreen(th: UiTheme, msgs: List<Pair<String, String>>, online: Boolean, send: (String) -> Unit, openPro: () -> Unit = {}) {
     var t by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxSize().padding(12.dp)) {
-        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val ls = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(msgs.size, msgs.lastOrNull()?.second?.length ?: 0) { if (msgs.isNotEmpty()) ls.scrollToItem(msgs.lastIndex) }
+    Column(Modifier.fillMaxSize().imePadding().padding(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Divya Chat", color = th.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(if (online) "🟢 Online (Gemini Live)" else "🟠 Offline smart mode (bina internet)", color = th.text.copy(alpha = 0.6f), fontSize = 11.sp)
+            }
+            TextButton(openPro) { Text("🚀 Pro Chat", color = th.accent) }
+        }
+        LazyColumn(Modifier.weight(1f), state = ls, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(msgs) { (who, txt) ->
                 val me = who != "Divya"
                 Box(Modifier.fillMaxWidth(), contentAlignment = if (me) Alignment.CenterEnd else Alignment.CenterStart) {

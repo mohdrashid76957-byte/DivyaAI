@@ -97,7 +97,8 @@ object ProState {
     }
 
     fun newChat(c: Context) { stop(); msgs.clear(); baseZip = null; c.getSharedPreferences("divya", 0).edit().remove("proBaseZip").apply(); save(c) }
-    fun stop() { cancel.set(true); try { ProEngine.curCall?.cancel() } catch (_: Exception) {} }
+    @Volatile var userStopped = false
+    fun stop() { userStopped = true; cancel.set(true); try { ProEngine.curCall?.cancel() } catch (_: Exception) {} }
 
     private fun systemPrompt(c: Context): String {
         val p = c.getSharedPreferences("divya", 0)
@@ -164,7 +165,7 @@ object ProState {
 
     private fun go(c: Context, project: Boolean, projectReq: String) {
         val m = PMsg("model"); m.busy = true
-        msgs.add(m); busy = true; cancel.set(false); startedAt = System.currentTimeMillis()
+        msgs.add(m); busy = true; userStopped = false; cancel.set(false); startedAt = System.currentTimeMillis()
         val hist = msgs.toList().dropLast(1)
         val md = mode; val wb = web
         val ctx = c.applicationContext
@@ -202,10 +203,10 @@ object ProState {
                         val now = System.currentTimeMillis()
                         if (now - lastPost > 80) { lastPost = now; val s = last.toString(); main.post { m.text = s } }
                     }
-                    main.post { m.text = if (full.isBlank() && cancel.get()) "(rok diya)" else full.ifBlank { "(khali jawab - dobara try karo)" } }
+                    main.post { m.text = if (full.isBlank() && userStopped) "(rok diya)" else full.ifBlank { "(khali jawab - dobara try karo)" } }
                 }
             } catch (e: Exception) {
-                val msg = if (cancel.get()) "(rok diya)" else "⚠️ ${e.message}"
+                val msg = if (userStopped) "(rok diya)" else "⚠️ ${e.message}"
                 main.post { m.text = if (m.text.isBlank() || m.text.startsWith("⚠️")) msg else m.text + "\n\n" + msg }
             } finally {
                 main.post { m.busy = false; m.status = ""; busy = false; usedModel = ProEngine.lastModel; save(ctx) }
@@ -485,13 +486,13 @@ fun ProChatScreen(th: UiTheme, openCode: () -> Unit) {
                 try { speech.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)) }
                 catch (_: Exception) { Toast.makeText(ctx, "Voice typing is phone mein nahi hai", Toast.LENGTH_SHORT).show() }
             }) { Icon(Icons.Filled.Mic, "Bolo", tint = th.accent) }
-            if (ProState.busy) IconButton({
-                if (System.currentTimeMillis() - ProState.startedAt < 3000) Toast.makeText(ctx, "Jawab aa raha hai… ruko. Rokna ho to 3 sec baad Stop dabao", Toast.LENGTH_SHORT).show()
-                else ProState.stop()
-            }) { Icon(Icons.Filled.Stop, "Roko", tint = Color(0xFFE53935)) }
-            else IconButton({
-                if (input.isNotBlank() || atts.isNotEmpty()) { ProState.send(ctx, input, atts.toList()); input = ""; atts.clear() }
-            }) { Icon(Icons.Filled.Send, "Bhejo", tint = th.accent) }
+            // Send hamesha wahi jagah rehta hai (jawab chalte waqt bhi). Stop alag button hai, taaki galti se tap na ho.
+            IconButton({
+                if (!ProState.busy && (input.isNotBlank() || atts.isNotEmpty())) { ProState.send(ctx, input, atts.toList()); input = ""; atts.clear() }
+            }) { Icon(Icons.Filled.Send, "Bhejo", tint = th.accent.copy(alpha = if (ProState.busy) 0.3f else 1f)) }
+        }
+        if (ProState.busy) TextButton({ ProState.stop() }, Modifier.align(Alignment.CenterHorizontally)) {
+            Text("⏹ Jawab roko", color = Color(0xFFE53935), fontSize = 13.sp)
         }
     }
 

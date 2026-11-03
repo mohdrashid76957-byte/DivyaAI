@@ -432,11 +432,32 @@ class OfflineBrain(
         return "Jawab hai " + fmt(r) + "."
     }
 
-    /** Return: jawab (bolne ke liye). null = offline mode band karo. */
-    private fun exec(raw: String): String? {
+    /** Typed chat (Chat screen) se seedha sawaal: bina mic/TTS ke jawab text mein deti hai. Voice lock typed par nahi lagta. */
+    fun askText(text: String, cb: (String) -> Unit) {
+        bg.execute {
+            val r = try { exec(text, true) } catch (e: Exception) { "Kuch gadbad ho gayi: ${e.message}" }
+            h.post { val out = r ?: "Theek hai ${name()}, bye!"; lastReply = out; cb(out) }
+        }
+    }
+
+    private val CHAIN = Regex("\\s+(?:phir|fir|uske baad|uske bad|then|and then|फिर|उसके बाद)\\s+")
+
+    /** Return: jawab (bolne ke liye). null = offline mode band karo. Ek hi line mein kai kaam ("torch chalu karo phir volume badhao") chain mein chalte hain. */
+    private fun exec(raw: String, typed: Boolean = false): String? {
+        val fixed = OfflineSmart.fixTypos(raw)
+        val parts = CHAIN.split(fixed.trim()).filter { it.isNotBlank() }
+        if (parts.size in 2..4 && pending == null) {
+            val outs = ArrayList<String>()
+            for (x in parts) { val r = execOne(x, typed) ?: return null; outs.add(r) }
+            return outs.joinToString(" ")
+        }
+        return execOne(fixed, typed)
+    }
+
+    private fun execOne(raw: String, typed: Boolean): String? {
         val t = raw.lowercase(Locale.ROOT).trim()
         val svc = DivyaService.instance
-        val voiceLock = p.getBoolean("voiceLock", false) && p.getInt("vgMode", 1) >= 1
+        val voiceLock = !typed && p.getBoolean("voiceLock", false) && p.getInt("vgMode", 1) >= 1
         val phoneLocked = (ctx.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager).isKeyguardLocked && p.getBoolean("needUnlock", true)
         // Sensitive kaam ke pehle: voice lock ON ho to offline mein block (offline mein awaaz match nahi ho sakti); phone locked ho to bhi block
         fun gate(): String? =
@@ -685,6 +706,7 @@ class OfflineBrain(
             return if (Actions.openApp(ctx, app)) "$app khol diya." else "'$app' naam ka app nahi mila."
         }
 
+        OfflineSmart.answer(ctx, t, name())?.let { return it }
         return "Ye mujhe samajh nahi aaya. Poochho: 'kya kar sakti ho' to main batati hoon."
     }
 
