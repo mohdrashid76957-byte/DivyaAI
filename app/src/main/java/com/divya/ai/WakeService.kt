@@ -30,6 +30,9 @@ class WakeService : Service() {
     private var dead = false
     private var gen = 0                       // har naye recognizer ka id; purane ke callbacks ignore
     private val keys = listOf("divya", "दिव्या", "diviya", "divia", "deveya", "दिव्य")
+    // Language fallback: offline Hindi pack na ho to agli language, last mein phone ka default
+    private val langs: List<String?> = listOf("hi-IN", "en-IN", "en-US", null)
+    private var li = 0
 
     companion object {
         fun start(c: Context) { try { c.startForegroundService(Intent(c, WakeService::class.java)) } catch (_: Exception) {} }
@@ -84,6 +87,8 @@ class WakeService : Service() {
             override fun onResults(b: Bundle?) { if (my == gen && !check(b)) next(800) }
             override fun onError(e: Int) {
                 if (my != gen) return                           // purana recognizer (releaseMic ke baad) - ignore
+                // 12 = LANGUAGE_NOT_SUPPORTED, 13 = LANGUAGE_UNAVAILABLE: agli language try karo, turant
+                if (e == 12 || e == 13) { if (li < langs.size - 1) li++; next(400); return }
                 val d = when (e) {
                     SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 4000L
                     SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> 15000L
@@ -99,12 +104,13 @@ class WakeService : Service() {
             override fun onEndOfSpeech() {}
             override fun onEvent(t: Int, p: Bundle?) {}
         })
+        val lang = langs[li.coerceIn(0, langs.size - 1)]
         val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
-            .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, lang != null)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        if (lang != null) i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
         try { r.startListening(i) } catch (_: Exception) { next(2000) }
     }
 

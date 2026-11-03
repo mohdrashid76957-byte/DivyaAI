@@ -211,3 +211,13 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - **Bug:** Background mein "Divya" sunne wala listener aur Gemini session ek hi mic ke liye lad rahe the, aur har recognizer cycle par mic on/off ho raha tha.
 - **Fix:** Session chalne par wake listener ka mic poora release hota hai. Purane recognizer ke callbacks ignore hote hain (double loop nahi). No-match par wait ~1.8 sec, aur session chal raha ho to wake trigger nahi hota.
 - Note: Android ka SpeechRecognizer har cycle mein mic kholta hai, isliye mic indicator kabhi-kabhi dikh sakta hai. Poori tarah band karne ke liye offline hotword engine (jaise Vosk ya Porcupine) chahiye.
+
+## v2.10.2 - Wake word language fix
+- **Bug:** WakeService sirf hi-IN use karta tha. Offline Hindi pack na ho to recognizer error 12/13 deta tha, aur har retry par mic on/off hota tha, aur "Divya" kabhi sunai nahi deta tha.
+- **Fix:** language fallback chain: hi-IN -> en-IN -> en-US -> phone ka default. Language error par turant agli language. Offline preference sirf offline-capable languages ke liye.
+
+## v2.11.0 - Notification, call aur charger announcements
+- **Notification padh kar sunao:** koi nayi notification aaye to app ka naam aur title/text bolta hai (Settings > Announcements se ON/OFF).
+- **Call par naam:** call notification aaye to bolta hai: "Rashid sir, [caller ka naam] ka call aa raha hai." Naam Settings mein badal sakte ho. Naam na mile to "anjaan number".
+- **Charger:** lagane par "Charger laga diya gaya hai, battery X percent", hatane par "Charger hata diya gaya hai".
+- Notification access ON honi zaroori hai (Permissions > Notification access). Call ki awaaz dialer app ki notification par depend karti hai, jo zyadatar phones post karte hain.

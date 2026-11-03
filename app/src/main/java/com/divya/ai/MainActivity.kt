@@ -505,6 +505,7 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     Btn(th, "Save") { prefs.edit().putString("key", key.trim()).putString("model", model.trim()).putString("voice", voice.trim()).putString("call", callName.trim().ifBlank { "Sir" }).apply(); saved = true }
     if (saved) Text("✅ Saved", color = th.accent)
     Btn(th, "Backup & restore (yaadein, chats)") { openBackup() }
+    AnnounceSettings(th, prefs)
     Text("UI Design / Avatar (3D, Anime, Blue, Gold, Pink, Neon…)", color = th.accent, fontWeight = FontWeight.Bold)
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         themes.forEachIndexed { i, t -> FilterChip(themeIdx == i, { setTheme(i) }, { Text(t.name, fontSize = 11.sp) }) }
