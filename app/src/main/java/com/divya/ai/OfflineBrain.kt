@@ -30,12 +30,15 @@ import java.util.concurrent.Executors
 
 object Net {
     /** Internet chal raha hai? (check fail ho to online maan lete hain, taaki purana behaviour na bigde) */
-    fun online(c: Context): Boolean = try {
-        val cm = c.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val cap = cm.getNetworkCapabilities(cm.activeNetwork ?: return false)
-        cap != null && cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-    } catch (_: Exception) { true }
+    fun online(c: Context): Boolean {
+        return try {
+            val cm = c.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val net = cm.activeNetwork
+            val cap = if (net == null) null else cm.getNetworkCapabilities(net)
+            cap != null && cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        } catch (_: Exception) { true }
+    }
 }
 
 /**
