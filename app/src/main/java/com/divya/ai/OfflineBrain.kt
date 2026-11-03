@@ -72,6 +72,7 @@ class OfflineBrain(
     private val h = Handler(Looper.getMainLooper())
     private val bg = Executors.newSingleThreadExecutor()
     private var sr: SpeechRecognizer? = null
+    private var srMode = -1                 // recognizer kis mode ke liye bana (reuse ke liye)
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var speaking = false
@@ -198,15 +199,24 @@ class OfflineBrain(
     private fun listen() {
         if (!active || speaking) return
         if (now() - lastHeard > 40_000) { stop("Offline mode band (kuch suna nahi)"); return }
-        try { sr?.destroy() } catch (_: Exception) {}
         val my = ++lsn
         var ready = false
         var maxRms = 0f
-        val r = try { newRecognizer() } catch (e: Throwable) {
-            if (advanceMode()) h.postDelayed({ listen() }, 200) else stop("Recognizer nahi bana: ${e.message}")
-            return
+        // Recognizer har turn par nahi banta: same mode ka ho to reuse (bahut tez), mode badle to naya
+        val old = sr
+        val reuse = old != null && srMode == mode
+        val r: SpeechRecognizer = if (reuse) {
+            try { old!!.cancel() } catch (_: Exception) {}
+            old!!
+        } else {
+            try { old?.destroy() } catch (_: Exception) {}
+            sr = null
+            try { newRecognizer() } catch (e: Throwable) {
+                if (advanceMode()) h.postDelayed({ listen() }, 200) else stop("Recognizer nahi bana: ${e.message}")
+                return
+            }
         }
-        sr = r
+        sr = r; srMode = mode
         r.setRecognitionListener(object : RecognitionListener {
             override fun onResults(b: Bundle?) {
                 if (!active || my != lsn) return
@@ -235,7 +245,7 @@ class OfflineBrain(
                         else if (!heard && noMatch >= 3) onStatus("Mic mein awaaz nahi aa rahi (screen recorder/dusri app mic le rahi?) $tag")
                         else if (heard && noMatch >= 2 && langIdx < langs.size - 1) { langIdx++; noMatch = 0; onStatus("Samajh nahi aaya, ${langs[langIdx]} try kar rahi hoon") }
                         else onStatus("Suna nahi, dobara boliye $tag")
-                        h.postDelayed({ listen() }, 250)
+                        h.postDelayed({ listen() }, 120)
                     }
                     3, 5, 11 -> {
                         if (advanceMode()) { onStatus("Err $e, $modeName par ja rahi hoon"); h.postDelayed({ listen() }, 300) }
@@ -265,6 +275,9 @@ class OfflineBrain(
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            // Bolna khatam hone ke baad jaldi jawab (default lamba tha)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 800L)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
         onStatus("Offline: shuru ho rahi hoon… (${langs[langIdx]} • $modeName)")
         try { r.startListening(i) } catch (_: Exception) { h.postDelayed({ listen() }, 1000) }
         // watchdog: 4 sec mein recognizer ready na ho to agle mode par

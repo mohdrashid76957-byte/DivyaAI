@@ -231,3 +231,9 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - **Subah ka briefing:** din ki pehli baar subah (12 baje se pehle) screen on hone par date, battery aur notifications ki ginti bolti hai.
 - Settings > Announcements > "Screen on par greeting aur subah ka briefing" se ON/OFF.
 - Mausam aur calendar abhi nahi (mausam ke liye API key, calendar ke liye alag permission chahiye).
+
+## v2.14.0 - Offline brain tez
+- **Recognizer reuse:** har turn par naya recognizer nahi banta, same mode mein dobara use hota hai. Mode badalne par hi naya banta hai.
+- **Jaldi jawab:** bolna khatam hone ke baad silence 800ms (pehle lamba tha), possibly-complete 600ms.
+- **Retry:** "suna nahi" ke baad 120ms mein dobara sunta hai.
+- Note: offline mein Gemini jaisi samajh nahi aa sakti. Ye sirf speed fix hai, samajh ki quality nahi.
