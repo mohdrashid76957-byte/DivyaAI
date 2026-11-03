@@ -4,6 +4,7 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.os.Handler
+import android.util.Log
 import android.os.IBinder
 import android.os.Looper
 import android.speech.RecognitionListener
@@ -80,6 +81,7 @@ class WakeService : Service() {
             fun check(b: Bundle?): Boolean {
                 if (my != gen || WakeBus.liveActive) return false   // session chal raha hai to wake mat karo
                 val l = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: return false
+                Log.d("WakeService", "heard: $l")
                 if (l.any { matches(it) }) { wake(); return true }
                 return false
             }
@@ -87,6 +89,7 @@ class WakeService : Service() {
             override fun onResults(b: Bundle?) { if (my == gen && !check(b)) next(800) }
             override fun onError(e: Int) {
                 if (my != gen) return                           // purana recognizer (releaseMic ke baad) - ignore
+                Log.w("WakeService", "error $e" + if (e == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) " (mic kisi aur app ke paas hai, jaise Maya)" else "")
                 // 12 = LANGUAGE_NOT_SUPPORTED, 13 = LANGUAGE_UNAVAILABLE: agli language try karo, turant
                 if (e == 12 || e == 13) { if (li < langs.size - 1) li++; next(400); return }
                 val d = when (e) {

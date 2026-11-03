@@ -237,3 +237,6 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - **Jaldi jawab:** bolna khatam hone ke baad silence 800ms (pehle lamba tha), possibly-complete 600ms.
 - **Retry:** "suna nahi" ke baad 120ms mein dobara sunta hai.
 - Note: offline mein Gemini jaisi samajh nahi aa sakti. Ye sirf speed fix hai, samajh ki quality nahi.
+
+## v2.14.1 - Wake word debug logs
+- WakeService ab logcat mein "heard: ..." aur "error N" likhta hai (filter: WakeService). Recognizer busy (error 8) ho to message batata hai ki mic kisi aur app ke paas hai.
