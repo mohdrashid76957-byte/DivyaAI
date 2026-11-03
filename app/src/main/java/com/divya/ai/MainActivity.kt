@@ -20,6 +20,11 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -54,7 +59,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
-enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, Journal, Study, Scan, About, Code, Preview, Guardian }
+enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, Journal, Study, Scan, About, Code, Preview, Guardian, Backup }
 
 class UiTheme(
     val name: String, val img: Int, val circle: Boolean, val bg: Brush, val text: Color, val accent: Color,
@@ -264,7 +269,15 @@ fun DivyaApp(ctx: Context) {
     Box(Modifier.fillMaxSize().background(th.bg)) {
     Column(Modifier.fillMaxSize().systemBarsPadding()) {
         Box(Modifier.weight(1f)) {
-            when (screen) {
+            // Screen badalne par smooth fade + slide
+            AnimatedContent(
+                targetState = screen,
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    (fadeIn(tween(240)) + slideInVertically(tween(240)) { it / 20 }) togetherWith fadeOut(tween(160))
+                },
+                label = "screen"
+            ) { s -> when (s) {
                 Screen.Home -> if (th.neon) NeonHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic, {
                     // Avatar par tap: agla avatar design (Neon, 3D, Anime, Blue, Gold, Pink)
                     val n = themes.indices.filter { themes[it].neon }
@@ -285,10 +298,11 @@ fun DivyaApp(ctx: Context) {
                 Screen.Automate -> AutomateScreen(th)
                 Screen.Phone -> PhoneScreen(th, ctx) { screen = Screen.Perms }
                 Screen.Guardian -> GuardianScreen(th, prefs, ctx)
-                Screen.Settings -> SettingsScreen(th, prefs, themeIdx, { themeIdx = it; prefs.edit().putInt("theme2", it).apply() }, { screen = Screen.Guardian }) { screen = Screen.Perms }
+                Screen.Settings -> SettingsScreen(th, prefs, themeIdx, { themeIdx = it; prefs.edit().putInt("theme2", it).apply() }, { screen = Screen.Guardian }, { screen = Screen.Backup }) { screen = Screen.Perms }
                 Screen.Perms -> PermsScreen(th, ctx)
                 Screen.About -> AboutScreen(th)
-            }
+                Screen.Backup -> BackupScreen(th, ctx)
+            } }
         }
         if (th.neon) NeonNav(screen, micNow, tapMic) { screen = it }
         else if (th.maya) MayaNav(th, screen, micNow, tapMic) { screen = it }
@@ -475,7 +489,7 @@ fun PhoneScreen(th: UiTheme, ctx: Context, openPerms: () -> Unit) = Page(th, "Ph
 }
 
 @Composable
-fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeIdx: Int, setTheme: (Int) -> Unit, openGuardian: () -> Unit, openPerms: () -> Unit) = Page(th, "Settings") {
+fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeIdx: Int, setTheme: (Int) -> Unit, openGuardian: () -> Unit, openBackup: () -> Unit, openPerms: () -> Unit) = Page(th, "Settings") {
     var key by remember { mutableStateOf(prefs.getString("key", "") ?: "") }
     var model by remember { mutableStateOf(prefs.getString("model", "gemini-3.8-live")!!) }
     var voice by remember { mutableStateOf(prefs.getString("voice", "Aoede")!!) }
@@ -490,6 +504,7 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     OutlinedTextField(callName, { callName = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Divya tumhe kya bulaye (Sir / Boss / naam)") }, colors = colors)
     Btn(th, "Save") { prefs.edit().putString("key", key.trim()).putString("model", model.trim()).putString("voice", voice.trim()).putString("call", callName.trim().ifBlank { "Sir" }).apply(); saved = true }
     if (saved) Text("✅ Saved", color = th.accent)
+    Btn(th, "Backup & restore (yaadein, chats)") { openBackup() }
     Text("UI Design / Avatar (3D, Anime, Blue, Gold, Pink, Neon…)", color = th.accent, fontWeight = FontWeight.Bold)
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         themes.forEachIndexed { i, t -> FilterChip(themeIdx == i, { setTheme(i) }, { Text(t.name, fontSize = 11.sp) }) }

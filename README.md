@@ -200,3 +200,9 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 
 ## v2.9.1 - Voice Guardian live match meter
 - Voice Guardian dashboard mein ab live match bar: Talk ON karke bolo, owner/anjaan ka match % bar mein turant dikhta hai (Maya jaisa).
+
+## v2.10 - Smooth UI + Backup & restore
+- **Smooth screen transitions:** screens ab fade + slide animation ke saath badalti hain (AnimatedContent).
+- **Tile touch feel:** Neon home ki tiles dabane par halka spring sikudna, Maya jaisa smooth touch.
+- **Backup & restore (naya):** Settings > "Backup & restore" se yaadein (notes), Pro chats, scan history aur settings ek JSON file mein share karo. Dusre phone par "Backup file se restore karo". API key aur privacy password backup mein nahi jaate (security), naye phone par dobara daalne honge.
+- Version 2.10.0 (versionCode 26).

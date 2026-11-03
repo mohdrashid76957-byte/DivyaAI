@@ -7,6 +7,8 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -57,9 +59,14 @@ fun WaveBars(color: Color, active: Boolean, modifier: Modifier) {
 
 @Composable
 private fun NeonTile(t: NeonTileData, modifier: Modifier, edge: Brush) {
-    Box(modifier.height(78.dp).clip(RoundedCornerShape(16.dp))
+    // Dabane par halka sikudna (spring) - Maya jaisa smooth touch feel
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val sc by animateFloatAsState(if (pressed) 0.93f else 1f, spring(dampingRatio = 0.55f, stiffness = 500f), label = "tilePress")
+    Box(modifier.height(78.dp).graphicsLayer { scaleX = sc; scaleY = sc }.clip(RoundedCornerShape(16.dp))
         .background(Brush.horizontalGradient(listOf(Color(0xFF14043A), Color(0xFF0A0222))))
-        .border(1.5.dp, edge, RoundedCornerShape(16.dp)).clickable { t.onClick() }.padding(8.dp)) {
+        .border(1.5.dp, edge, RoundedCornerShape(16.dp))
+        .clickable(interactionSource = src, indication = null) { t.onClick() }.padding(8.dp)) {
         Column(Modifier.align(Alignment.CenterStart)) {
             Icon(t.icon, t.title, tint = t.tint, modifier = Modifier.size(24.dp))
             Spacer(Modifier.height(4.dp))
