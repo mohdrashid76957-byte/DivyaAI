@@ -65,6 +65,7 @@ object ProState {
     var web by mutableStateOf(false)
     var projectMode by mutableStateOf(false)
     var usedModel by mutableStateOf("")
+    @Volatile var startedAt = 0L                    // jawab kab shuru hua (Stop ke galat tap se bachne ke liye)
     private val cancel = AtomicBoolean(false)
     private val main = Handler(Looper.getMainLooper())
     private var loaded = false
@@ -105,13 +106,28 @@ object ProState {
             (if (custom.isNotBlank()) " USER'S CUSTOM INSTRUCTIONS: $custom" else "")
     }
 
-    private fun contents(hist: List<PMsg>): JSONArray {
+    private val ZIP_WORDS = listOf("zip", "project", "file", "code", "bug", "fix", "error", "add", "change", "upgrade", "update", "build",
+        "app", "feature", "kotlin", "gradle", "screen", "banao", "badlo", "theek", "sahi", "dekho", "improve", "optimi", "refactor", ".kt", ".xml")
+
+    private fun contents(hist: List<PMsg>, mode: Int): JSONArray {
         val arr = JSONArray()
+        // ZIP sirf sabse naye zip wale message mein, aur wo bhi chhota/relevant (poora ZIP har baar bhejna bahut slow tha)
+        val zipHolder = hist.lastOrNull { m -> m.atts.any { it.zipFile != null } }
+        val lastUser = hist.lastOrNull { it.role == "user" }
+        val q = lastUser?.text.orEmpty()
+        val ql = q.lowercase()
+        val light = lastUser !== zipHolder && q.length <= 40 && ZIP_WORDS.none { ql.contains(it) }
+        val zipBudget = when (mode) { 0 -> 70_000; 1 -> 110_000; else -> 180_000 }
+        fun attText(m: PMsg, a: PAtt): String? {
+            val zf = a.zipFile
+            if (zf != null) return if (m === zipHolder) ZipCtx.build(zf, q + " " + m.text, zipBudget, light) else "[Pehle attach kiya gaya ZIP: ${a.name}]"
+            return a.text
+        }
         var budget = 900_000
         val keep = ArrayList<PMsg>()
         for (m in hist.asReversed()) {          // sabse naya pehle, budget khatam hone par purana chhod do
             if (m.text.isBlank() && m.atts.isEmpty()) continue
-            budget -= m.text.length + m.atts.sumOf { (it.text?.length ?: 0) + (it.b64?.length ?: 0) / 4 }
+            budget -= m.text.length + m.atts.sumOf { a -> if (a.zipFile != null) (if (m === zipHolder) zipBudget else 60) else (a.text?.length ?: 0) + (a.b64?.length ?: 0) / 4 }
             if (budget < 0 && keep.isNotEmpty()) break
             keep.add(m)
         }
@@ -119,7 +135,10 @@ object ProState {
             val parts = JSONArray()
             for (a in m.atts) {
                 if (a.b64 != null) parts.put(JSONObject().put("inlineData", JSONObject().put("mimeType", a.mime).put("data", a.b64)))
-                else if (a.text != null) parts.put(JSONObject().put("text", "[Attached file: ${a.name}]\n```\n${a.text}\n```"))
+                else {
+                    val t = attText(m, a)
+                    if (t != null) parts.put(JSONObject().put("text", "[Attached file: ${a.name}]\n```\n$t\n```"))
+                }
             }
             if (m.text.isNotBlank()) parts.put(JSONObject().put("text", m.text))
             if (parts.length() == 0) continue
@@ -127,7 +146,6 @@ object ProState {
         }
         return arr
     }
-
     fun send(c: Context, text: String, atts: List<PAtt>) {
         if (busy || (text.isBlank() && atts.isEmpty())) return
         val u = PMsg("user", text.trim(), atts)
@@ -146,7 +164,7 @@ object ProState {
 
     private fun go(c: Context, project: Boolean, projectReq: String) {
         val m = PMsg("model"); m.busy = true
-        msgs.add(m); busy = true; cancel.set(false)
+        msgs.add(m); busy = true; cancel.set(false); startedAt = System.currentTimeMillis()
         val hist = msgs.toList().dropLast(1)
         val md = mode; val wb = web
         val ctx = c.applicationContext
@@ -177,9 +195,9 @@ object ProState {
                     main.post { m.text = sb.toString(); m.project = r.name }
                 } else {
                     val last = StringBuilder(); var lastPost = 0L
-                    val sys = systemPrompt(ctx) + (if (baseZip != null) " PROJECT UPDATE: the user attached their project as a ZIP (all text files are in the conversation as '=== FILE: path ==='). " +
+                    val sys = systemPrompt(ctx) + (if (baseZip != null) " PROJECT UPDATE: the user attached their project as a ZIP (the conversation has the file tree, FULL files as '=== FILE: path ===' and OUTLINE-only entries for the rest; only rewrite files you have in FULL, otherwise ask the user to name the file). " +
                         "When asked to change/fix/add something, output the COMPLETE new content of EVERY file you change or add (never diffs or partial snippets), each preceded by its exact path from the ZIP in bold on its own line like **app/src/main/java/com/x/File.kt**, in a fenced code block. Do not repeat unchanged files. After the code, list in 2-3 lines what you changed. The app will merge them into an updated ZIP automatically; mention that the user taps '🔄 Updated ZIP'." else "")
-                    val full = ProEngine.stream(ctx, sys, contents(hist), md, wb, cancel) { d ->
+                    val full = ProEngine.stream(ctx, sys, contents(hist, md), md, wb, cancel) { d ->
                         last.append(d)
                         val now = System.currentTimeMillis()
                         if (now - lastPost > 80) { lastPost = now; val s = last.toString(); main.post { m.text = s } }
@@ -321,7 +339,7 @@ private fun zipAtt(c: Context, uri: Uri, name: String): PAtt {
     }
     if (count == 0) throw AttErr("ZIP mein padhne layak text/code file nahi mili")
     val head = "Project ZIP '$name': $count text files included" + (if (skipped > 0) ", $skipped binary/bade files skipped" else "") + (if (capped) ", BAKI FILES size limit ki wajah se chhooti" else "") + "."
-    return PAtt(name, "application/zip", null, head + "\n" + sb, f)
+    return PAtt(name, "application/zip", null, head, f)
 }
 
 private fun loadAtt(c: Context, uri: Uri): PAtt {
@@ -467,7 +485,10 @@ fun ProChatScreen(th: UiTheme, openCode: () -> Unit) {
                 try { speech.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)) }
                 catch (_: Exception) { Toast.makeText(ctx, "Voice typing is phone mein nahi hai", Toast.LENGTH_SHORT).show() }
             }) { Icon(Icons.Filled.Mic, "Bolo", tint = th.accent) }
-            if (ProState.busy) IconButton({ ProState.stop() }) { Icon(Icons.Filled.Stop, "Roko", tint = Color(0xFFE53935)) }
+            if (ProState.busy) IconButton({
+                if (System.currentTimeMillis() - ProState.startedAt < 3000) Toast.makeText(ctx, "Jawab aa raha hai… ruko. Rokna ho to 3 sec baad Stop dabao", Toast.LENGTH_SHORT).show()
+                else ProState.stop()
+            }) { Icon(Icons.Filled.Stop, "Roko", tint = Color(0xFFE53935)) }
             else IconButton({
                 if (input.isNotBlank() || atts.isNotEmpty()) { ProState.send(ctx, input, atts.toList()); input = ""; atts.clear() }
             }) { Icon(Icons.Filled.Send, "Bhejo", tint = th.accent) }

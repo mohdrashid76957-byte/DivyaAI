@@ -88,7 +88,7 @@ object ProEngine {
 
     private fun discover(c: Context) {
         val k = key(c); if (k.isBlank()) return
-        val cl = http.newBuilder().readTimeout(15, TimeUnit.SECONDS).build()
+        val cl = http.newBuilder().readTimeout(8, TimeUnit.SECONDS).build()
         val names = ArrayList<String>(); var token = ""
         for (page in 0 until 5) {
             val url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" + (if (token.isNotBlank()) "&pageToken=$token" else "")
@@ -168,67 +168,149 @@ object ProEngine {
         return sb.toString()
     }
 
-    /** Streaming jawab (SSE). onDelta har naye tukde par. Cancel par ab tak ka text wapas. */
-    fun stream(c: Context, system: String, contents: JSONArray, mode: Int, web: Boolean, cancel: AtomicBoolean, onDelta: (String) -> Unit): String {
-        val k = key(c); if (k.isBlank()) throw ApiError("Gemini API key nahi hai. Settings mein daalo.")
-        var model = modelFor(c, mode)
-        var think = thinkFor(model, mode)
-        var rediscovered = false
-        val triedM = HashSet<String>().apply { add(model) }
-        val sb = StringBuilder()
-        var tries = 0
-        while (true) {
-            if (cancel.get()) return sb.toString()
-            lastModel = model
-            val req = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/$model:streamGenerateContent?alt=sse")
-                .header("x-goog-api-key", k)
-                .post(body(system, contents, think, false, web, 32768, 0.6).toRequestBody("application/json".toMediaType())).build()
-            // Pehle byte ka timeout: model chup baith jaye (busy) to hamesha mat ruko, agle model par jao
-            val call = http.newBuilder().readTimeout(when (mode) { 0 -> 25L; 1 -> 45L; else -> 90L }, TimeUnit.SECONDS).build().newCall(req); curCall = call
-            var retryWait = -1L
+    private sealed class Ev {
+        class Delta(val m: String, val t: String) : Ev()
+        class Done(val m: String) : Ev()
+        class Fail(val m: String, val code: Int, val txt: String, val e: Exception?) : Ev()
+    }
+
+    /** Ek model ke liye ek SSE connection (alag thread mein). Events queue mein jaate hain. */
+    private fun startLane(k: String, model: String, system: String, contents: JSONArray, mode: Int, web: Boolean,
+                          q: java.util.concurrent.LinkedBlockingQueue<Ev>, calls: java.util.concurrent.ConcurrentHashMap<String, okhttp3.Call>,
+                          alive: () -> Boolean) {
+        Thread {
+            var think = thinkFor(model, mode)
+            var retried = false
             try {
-                call.execute().use { r ->
-                    if (!r.isSuccessful) {
-                        val t = r.body?.string().orEmpty()
-                        if (r.code == 404 && !rediscovered) {
-                            rediscovered = true
-                            val nm = autoModel(c, mode == 2, true)
-                            if (nm != model) { model = nm; think = thinkFor(nm, mode); retryWait = 0; return@use }
+                while (alive()) {
+                    val bodyStr = body(system, contents, think, false, web, 32768, 0.6)
+                    val req = Request.Builder()
+                        .url("https://generativelanguage.googleapis.com/v1beta/models/$model:streamGenerateContent?alt=sse")
+                        .header("x-goog-api-key", k)
+                        .post(bodyStr.toRequestBody("application/json".toMediaType())).build()
+                    val call = http.newBuilder().readTimeout(90, TimeUnit.SECONDS).build().newCall(req)
+                    calls[model] = call; curCall = call
+                    var retry = false
+                    var fail: Ev? = null
+                    call.execute().use { r ->
+                        if (!r.isSuccessful) {
+                            val t = r.body?.string().orEmpty()
+                            if (r.code == 400 && think != null && !retried) { think = null; retried = true; retry = true }
+                            else fail = Ev.Fail(model, r.code, t, null)
+                            return@use
                         }
-                        if (r.code == 400 && think != null) { think = null; retryWait = 0; return@use }
-                        if ((r.code == 429 || r.code >= 500) && sb.isEmpty()) {
-                            if (tries >= 1) {
-                                val fb = fallbackModel(c, triedM, mode == 2)
-                                if (fb != null) { triedM.add(fb); model = fb; think = thinkFor(fb, mode); tries = 0; retryWait = 0; return@use }
-                            }
-                            if (tries < 3) { retryWait = if (r.code == 429) 4000L * (tries + 1) else 1500L; return@use }
+                        val src = r.body!!.source()
+                        var got = false
+                        while (alive()) {
+                            val line = src.readUtf8Line() ?: break
+                            if (!line.startsWith("data:")) continue
+                            val js = line.substring(5).trim()
+                            if (js.isEmpty() || js == "[DONE]") continue
+                            val j = try { JSONObject(js) } catch (_: Exception) { continue }
+                            val br = j.optJSONObject("promptFeedback")?.optString("blockReason").orEmpty()
+                            if (br.isNotBlank()) { fail = Ev.Fail(model, -3, "Safety filter ne roka ($br). Sawaal thoda badal ke poochho.", null); break }
+                            val t = textOf(j)
+                            if (t.isNotEmpty()) { got = true; q.put(Ev.Delta(model, t)) }
                         }
-                        throw err(r.code, t, model, triedM)
+                        if (fail == null && alive()) q.put(if (got) Ev.Done(model) else Ev.Fail(model, -4, "Model ne khali jawab diya.", null))
                     }
-                    val src = r.body!!.source()
-                    while (!cancel.get()) {
-                        val line = src.readUtf8Line() ?: break
-                        if (!line.startsWith("data:")) continue
-                        val js = line.substring(5).trim()
-                        if (js.isEmpty() || js == "[DONE]") continue
-                        val j = JSONObject(js)
-                        val br = j.optJSONObject("promptFeedback")?.optString("blockReason").orEmpty()
-                        if (br.isNotBlank()) throw ApiError("Safety filter ne roka ($br). Sawaal thoda badal ke poochho.")
-                        val t = textOf(j)
-                        if (t.isNotEmpty()) { sb.append(t); onDelta(t) }
-                    }
+                    val fe = fail
+                    if (fe != null) { if (alive()) q.put(fe); break }
+                    if (retry) continue
+                    break
                 }
             } catch (e: java.io.IOException) {
-                if (cancel.get()) return sb.toString()
-                if (sb.isNotEmpty()) return sb.toString()
-                val fb = if (tries >= 1 || e is java.net.SocketTimeoutException) fallbackModel(c, triedM, mode == 2) else null
-                if (fb != null) { triedM.add(fb); model = fb; think = thinkFor(fb, mode); tries = 0; retryWait = 0 }
-                else if (tries < 2) retryWait = 1500
-                else throw ApiError("Internet/timeout problem: ${e.message}")
+                if (alive()) q.put(Ev.Fail(model, -1, "", e))
+            } catch (e: Exception) {
+                if (alive()) q.put(Ev.Fail(model, -1, "", e))
             }
-            if (retryWait >= 0) { tries++; try { Thread.sleep(retryWait) } catch (_: InterruptedException) {}; continue }
-            return sb.toString()
+        }.start()
+    }
+
+    private fun failToError(f: Ev.Fail, tried: Collection<String>): ApiError = when {
+        f.code > 0 -> err(f.code, f.txt, f.m, tried)
+        f.code == -3 || f.code == -4 -> ApiError(f.txt)
+        else -> ApiError("Internet/timeout problem: ${f.e?.message ?: "jawab nahi aaya"}")
+    }
+
+    /**
+     * Streaming jawab (SSE) - HEDGED: pehla model chup rahe to doosra model parallel mein shuru ho jata hai,
+     * jo pehle bolna shuru kare wahi jeet-ta hai, baaki cancel. Isse busy/atka hua model jawab nahi rokta.
+     */
+    fun stream(c: Context, system: String, contents: JSONArray, mode: Int, web: Boolean, cancel: AtomicBoolean, onDelta: (String) -> Unit): String {
+        val k = key(c); if (k.isBlank()) throw ApiError("Gemini API key nahi hai. Settings mein daalo.")
+        val pro = mode == 2
+        val primary = modelFor(c, mode)
+        val q = java.util.concurrent.LinkedBlockingQueue<Ev>()
+        val calls = java.util.concurrent.ConcurrentHashMap<String, okhttp3.Call>()
+        val win = java.util.concurrent.atomic.AtomicReference<String?>(null)
+        val tried = LinkedHashSet<String>()
+        val sb = StringBuilder()
+        val sizeExtra = (contents.toString().length / 20_000).coerceAtMost(60)
+        val hedgeMs = ((when (mode) { 0 -> 6L; 1 -> 10L; else -> 20L }) + sizeExtra.coerceAtMost(20)) * 1000
+        val totalMs = ((when (mode) { 0 -> 70L; 1 -> 100L; else -> 170L }) + sizeExtra) * 1000
+        val t0 = System.currentTimeMillis()
+        var lastStart = t0
+        var running = 0
+        var rediscovered = false
+        var retriedAll = false
+
+        fun launch(m: String) {
+            tried.add(m); lastModel = m; lastStart = System.currentTimeMillis(); running++
+            startLane(k, m, system, contents, mode, web, q, calls) { !cancel.get() && win.get().let { it == null || it == m } }
+        }
+
+        try {
+            launch(primary)
+            while (true) {
+                if (cancel.get()) return sb.toString()
+                val ev = q.poll(250, TimeUnit.MILLISECONDS)
+                val now = System.currentTimeMillis()
+                if (ev == null) {
+                    if (win.get() == null) {
+                        if (now - t0 > totalMs) throw ApiError("Models ne ${totalMs / 1000} sec mein jawab nahi diya (try kiye: ${tried.joinToString()}). Thodi der baad dobara bhejo ya ⚙ > '🔍 Models test' dekho.")
+                        if (running < 2 && now - lastStart > hedgeMs) fallbackModel(c, tried, pro)?.let { launch(it) }
+                    }
+                    continue
+                }
+                when (ev) {
+                    is Ev.Delta -> {
+                        if (win.get() == null) {
+                            win.set(ev.m); lastModel = ev.m
+                            for ((m, cl) in calls) if (m != ev.m) { try { cl.cancel() } catch (_: Exception) {} }
+                        }
+                        if (win.get() == ev.m) { sb.append(ev.t); onDelta(ev.t) }
+                    }
+                    is Ev.Done -> if (win.get() == ev.m) return sb.toString()
+                    is Ev.Fail -> {
+                        if (win.get() == ev.m) {                 // jeetne wala beech mein toota
+                            if (sb.isNotEmpty()) return sb.toString()
+                            win.set(null)
+                        }
+                        running--
+                        if (ev.code == 404 && !rediscovered) {
+                            rediscovered = true
+                            val nm = autoModel(c, pro, true)
+                            if (nm !in tried) { launch(nm); continue }
+                        }
+                        if (ev.code == -3) throw failToError(ev, tried)
+                        if (running >= 1) continue          // doosra model abhi chal raha hai, wahi dekho
+                        val nxt = fallbackModel(c, tried, pro)
+                        if (nxt != null) {
+                            if (ev.code == 429 || ev.code >= 500) { try { Thread.sleep(700) } catch (_: InterruptedException) {} }
+                            launch(nxt)
+                        } else if (running <= 0) {
+                            if (!retriedAll && (ev.code == 429 || ev.code >= 500 || ev.code == -1)) {   // sab busy: poori list ek baar dobara
+                                retriedAll = true
+                                try { Thread.sleep(2000) } catch (_: InterruptedException) {}
+                                tried.clear(); launch(primary)
+                            } else throw failToError(ev, tried)
+                        }
+                    }
+                }
+            }
+        } finally {
+            for ((_, cl) in calls) { try { cl.cancel() } catch (_: Exception) {} }
         }
     }
 

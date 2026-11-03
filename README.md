@@ -177,3 +177,17 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - **Android 13+:** phone se pooch leta hai ki kaunsi offline languages installed hain aur sirf unhi ko try karta hai.
 - **Screen par live feedback:** "Boliye (lang * mode)", bolte waqt "Sun rahi hoon", beech mein jo samjha wo text, aur error aaye to code ke saath (err N). Mic mein awaaz hi na aaye to alag message.
 - Awaaz aayi par samajh na aaye to agli language par chali jati hai.
+
+## v2.6.2 - Pro Chat "(rok diya)" fix
+- **Bug:** jawab chalte waqt Send button ki jagah wahi jagah Stop button aa jata tha. Dobara Send dabane (double-tap / impatience) par asal mein Stop dab jata tha aur har "hi" par "(rok diya)" aata tha.
+- **Fix:** jawab shuru hone ke 3 sec tak Stop kaam nahi karta (toast dikhta hai), uske baad hi roka ja sakta hai.
+- **Badi prompt (ZIP attach):** pehle-byte ka timeout ab prompt ki size ke hisaab se badhta hai (+1 sec har ~10 KB, max +75 sec), taaki poore project ZIP par model ko padhne ka waqt mile aur wo jaldi doosre model par na bhage.
+
+## v2.6.2 - Pro Chat (cloud AI) fast + ZIP fix
+- **Bug 1 (ZIP):** har message ke saath poora ZIP text (~700K chars) Gemini ko dobara jaata tha, isliye "hi" bhi minutes leta tha aur ZIP wali request atak jati thi.
+  - Ab `ZipCtx.kt`: file tree + README/manifest/gradle + sirf wo files poori jo aapke sawal se milti hain (file ka naam likho to pakka), baaki ka outline. Context Fast ~70K, Smart ~110K, Pro ~180K chars tak.
+  - ZIP sirf sabse naye zip-wale message mein jaata hai. "hi" jaisi chhoti baat par sirf file tree jaata hai, jawab turant.
+- **Bug 2 (atakna):** model chup/busy ho to pehle ek-ek karke 25-95 sec ke timeout ke baad agla model try hota tha (minutes lag jaate the).
+  - Ab **hedged stream**: pehla model Fast 6s / Smart 10s / Pro 20s mein na bole to agla model parallel shuru, jo pehle bole wahi jeetta hai, baaki cancel. Sab fail hone par poori list ek baar dobara. Kul wait Fast ~70s.
+  - Model ListModels ka timeout 15s se 8s.
+- Update ZIP flow wahi hai: badli hui file ka naam message mein likho taaki wo poori jaye (jaise "OfflineBrain.kt mein ye fix karo").
