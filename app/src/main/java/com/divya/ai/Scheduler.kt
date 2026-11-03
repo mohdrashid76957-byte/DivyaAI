@@ -143,6 +143,7 @@ object Scheduler {
 
 class SchedReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
+        if (!LicenseGate.isActive(c)) return
         val id = i.getIntExtra("id", -1); val pr = goAsync()
         Thread {
             try {
@@ -156,5 +157,5 @@ class SchedReceiver : BroadcastReceiver() {
 }
 
 class BootReceiver : BroadcastReceiver() {
-    override fun onReceive(c: Context, i: Intent) { if (i.action == Intent.ACTION_BOOT_COMPLETED) Scheduler.rearmAll(c) }
+    override fun onReceive(c: Context, i: Intent) { if (i.action == Intent.ACTION_BOOT_COMPLETED && LicenseGate.isActive(c)) Scheduler.rearmAll(c) }
 }

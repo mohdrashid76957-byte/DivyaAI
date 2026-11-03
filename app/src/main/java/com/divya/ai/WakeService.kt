@@ -34,6 +34,7 @@ class WakeService : Service() {
     override fun onBind(i: Intent?): IBinder? = null
 
     override fun onStartCommand(i: Intent?, f: Int, id: Int): Int {
+        if (!LicenseGate.isActive(this)) { stopSelf(); return START_NOT_STICKY }
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel("wake", "Divya wake word", NotificationManager.IMPORTANCE_MIN))
         val n = Notification.Builder(this, "wake").setContentTitle("Divya sun rahi hai")

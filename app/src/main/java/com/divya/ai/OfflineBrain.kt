@@ -97,6 +97,7 @@ class OfflineBrain(
     // ---------------- start / stop ----------------
     fun start() {
         if (active) return
+        if (!LicenseGate.isActive(ctx)) { onStatus("License activate karo"); return }
         if (!micOk(ctx)) { onStatus("Mic permission do"); return }
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) { onStatus("Is phone mein speech recognition nahi hai"); return }
         active = true; WakeBus.liveActive = true; lastHeard = now(); errs = 0

@@ -141,6 +141,7 @@ class GeminiLive(
 
     fun start(key: String, model: String, voice: String, withMic: Boolean = true, firstText: String? = null) {
         if (running) return
+        if (!LicenseGate.isActive(ctx)) { state("Error: License activate karo"); return }
         lastKey = key; lastModel = model; lastVoice = voice
         fastThink = ctx.getSharedPreferences("divya", 0).getBoolean("fastThink", true)
         ready = false; running = true; WakeBus.liveActive = true; lastAct = System.currentTimeMillis(); mic = withMic; pending = firstText; newTurn = true

@@ -136,13 +136,24 @@ class MainActivity : ComponentActivity() {
         super.onCreate(s)
         if (intent?.getBooleanExtra("wake", false) == true) WakeBus.req = true
         val p = getSharedPreferences("divya", 0)
-        if (p.getBoolean("wake", false) && micOk(this)) WakeService.start(this)
+        if (LicenseGate.isActive(this) && p.getBoolean("wake", false) && micOk(this)) WakeService.start(this)
         // Full-screen: status/navigation bar ke peeche bhi draw hone do, taaki RGB border poore screen par aaye
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         )
-        setContent { MaterialTheme { DivyaApp(this) } }
+        setContent {
+            MaterialTheme {
+                var unlocked by remember { mutableStateOf(LicenseGate.isActive(this)) }
+                if (unlocked) DivyaApp(this)
+                else Box(Modifier.fillMaxSize().background(Color(0xFF020611))) {
+                    LicenseScreen {
+                        unlocked = true
+                        if (getSharedPreferences("divya", 0).getBoolean("wake", false) && micOk(this@MainActivity)) WakeService.start(this@MainActivity)
+                    }
+                }
+            }
+        }
     }
     override fun onNewIntent(i: Intent) {
         super.onNewIntent(i); setIntent(i)
