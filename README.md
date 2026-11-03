@@ -221,3 +221,7 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - **Call par naam:** call notification aaye to bolta hai: "Rashid sir, [caller ka naam] ka call aa raha hai." Naam Settings mein badal sakte ho. Naam na mile to "anjaan number".
 - **Charger:** lagane par "Charger laga diya gaya hai, battery X percent", hatane par "Charger hata diya gaya hai".
 - Notification access ON honi zaroori hai (Permissions > Notification access). Call ki awaaz dialer app ki notification par depend karti hai, jo zyadatar phones post karte hain.
+
+## v2.12.0 - Low battery + missed call announcements
+- **Low battery:** battery kam hone par "Battery kam hai, charger laga do" (Settings > Announcements > Battery kam ho to bolo).
+- **Missed call:** missed call aaye to "Rashid sir, [naam] ki missed call aayi hai" (Settings > Missed call aaye to bolo).

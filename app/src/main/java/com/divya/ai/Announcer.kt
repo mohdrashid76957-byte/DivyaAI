@@ -60,6 +60,8 @@ fun AnnounceSettings(th: UiTheme, prefs: SharedPreferences) {
     AnnSwitch(th, "Notification aaye to padh kar sunao", "annNotif", prefs)
     AnnSwitch(th, "Call aaye to caller ka naam bolo", "annCall", prefs)
     AnnSwitch(th, "Charger lagane / hatane par bolo", "annCharge", prefs)
+    AnnSwitch(th, "Battery kam ho to bolo", "annBattery", prefs)
+    AnnSwitch(th, "Missed call aaye to bolo", "annMissed", prefs)
 }
 
 @Composable

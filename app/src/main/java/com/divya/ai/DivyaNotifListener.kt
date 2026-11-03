@@ -40,12 +40,13 @@ class DivyaNotifListener : NotificationListenerService() {
     private val powerRx = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             val p = getSharedPreferences("divya", 0)
-            if (!p.getBoolean("annCharge", true)) return
+            if (i.action != Intent.ACTION_BATTERY_LOW && !p.getBoolean("annCharge", true)) return
             val lvl = try { getSystemService(BatteryManager::class.java)?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1 } catch (_: Exception) { -1 }
             val pct = if (lvl >= 0) " Battery $lvl percent hai." else ""
             val msg = when (i.action) {
                 Intent.ACTION_POWER_CONNECTED -> "Charger laga diya gaya hai.$pct"
                 Intent.ACTION_POWER_DISCONNECTED -> "Charger hata diya gaya hai.$pct"
+                Intent.ACTION_BATTERY_LOW -> if (p.getBoolean("annBattery", true)) "Battery kam hai$pct. Charger laga do." else return
                 else -> return
             }
             Announcer.speak(c, msg)
@@ -57,6 +58,7 @@ class DivyaNotifListener : NotificationListenerService() {
         val f = IntentFilter().apply {
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
+            addAction(Intent.ACTION_BATTERY_LOW)
         }
         try {
             if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(powerRx, f, Context.RECEIVER_NOT_EXPORTED)
@@ -85,6 +87,14 @@ class DivyaNotifListener : NotificationListenerService() {
 
         if (n.notification.category == Notification.CATEGORY_CALL) {
             if (p.getBoolean("annCall", true)) announceCall(title, text)
+            return
+        }
+        if (n.notification.category == Notification.CATEGORY_MISSED_CALL) {
+            if (p.getBoolean("annMissed", true)) {
+                val who = (p.getString("annName", "Rashid sir") ?: "").ifBlank { "Sir" }
+                val caller = (if (title.isBlank()) text else title).ifBlank { "anjaan number" }
+                Announcer.speak(this, "$who, $caller ki missed call aayi hai.")
+            }
             return
         }
         if (!p.getBoolean("annNotif", true)) return
