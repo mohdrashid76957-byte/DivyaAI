@@ -197,3 +197,6 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - Bina password: Gemini/Offline voice, wake word, scheduler start nahi hote.
 - Password plain text nahi, salted SHA-256 hash (`License.kt` > `LicenseGate.HASH`). 5 galat koshish par 30 sec lock.
 - Manifest mein `allowBackup=false`, taaki reinstall par Google backup se unlock wapas na aa jaye.
+
+## v2.9.1 - Voice Guardian live match meter
+- Voice Guardian dashboard mein ab live match bar: Talk ON karke bolo, owner/anjaan ka match % bar mein turant dikhta hai (Maya jaisa).

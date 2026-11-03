@@ -840,6 +840,11 @@ fun GuardianScreen(th: UiTheme, prefs: android.content.SharedPreferences, ctx: C
             "unknown" -> "❓ Last: anjaan awaaz • match ${l.conf}%"
             else -> "ℹ️ Last: awaaz verify nahi ho paayi (typed chat ya bahut kam awaaz)"
         }, color = th.accent, fontSize = 13.sp)
+        // Live match meter (Maya jaisa): Divya ka session chalu karke ~3 sec bolo, yahan match % live badalta hai
+        if (l != null && l.role != "unverified") {
+            LinearProgressIndicator(progress = { (l.conf / 100f).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(), color = th.accent)
+        }
+        Text("🎙️ Home par Talk ON karo aur ~3 sec bolo, live match yahin dikhega.", color = th.text.copy(alpha = 0.6f), fontSize = 11.sp)
     }
 
     GCard(th) {
