@@ -150,3 +150,9 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 ## v2.4.5 - "soch rahi hoon" atakna fix
 - Model busy hone par connection khol kar chup baith jata tha aur app bina timeout ke ruki rehti thi. Ab jawab ka pehla hissa 25 sec (Smart 45, Pro 90) mein na aaye to app khud agle model par chali jati hai (project files ke liye 120 sec).
 - Intezaar ke dauran "soch rahi hoon… 12s • model-naam" dikhta hai. Stop button se kabhi bhi roka ja sakta hai.
+
+## v2.5.0 - Offline mode
+- Internet na ho (ya Settings mein "Hamesha Offline mode" ON ho) to mic dabane / "Wake up Divya" par Divya phone ki apni awaaz-pehchaan aur TTS se chalti hai, Gemini ke bina.
+- Offline commands: app kholo, call (naam/number), call uthao/kaato/speaker, time, date, battery, torch, volume, alarm, timer, Wi-Fi/Bluetooth settings, home/back/recents/lock/screenshot/scroll, notifications padho.
+- Pehli baar: Google app > Settings > Voice > Offline speech recognition mein Hindi + English download karo.
+- Voice Lock ON ho to offline mein sirf basic kaam (time, battery, torch, volume) chalte hain. Naya file: OfflineBrain.kt.

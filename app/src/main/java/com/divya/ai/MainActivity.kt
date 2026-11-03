@@ -183,6 +183,7 @@ fun DivyaApp(ctx: Context) {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) } catch (_: Exception) {}
         })
     }
+    val off = remember { OfflineBrain(ctx, { st -> status = st }, { w, t -> msgs.add(w to t) }) }
     val th = themes[themeIdx]
     val lightBars = th.name == "Lavender Light"
     SideEffect {
@@ -197,6 +198,8 @@ fun DivyaApp(ctx: Context) {
     fun voice() = prefs.getString("voice", "Aoede")!!
 
     fun toggle() {
+        if (off.active) { off.stop(); return }
+        if (!live.running && (!Net.online(ctx) || prefs.getBoolean("offlineOnly", false))) { off.start(); return }
         if (key().isBlank()) { status = "Settings mein Gemini API key daalo"; screen = Screen.Settings; return }
         if (live.running) { if (live.micOn) live.stop() else live.enableMic(); return }
         live.gfMode = prefs.getBoolean("gf", true); live.callName = prefs.getString("call", "Sir") ?: "Sir"
@@ -215,6 +218,7 @@ fun DivyaApp(ctx: Context) {
     LaunchedEffect(WakeBus.req) {
         if (!WakeBus.req) return@LaunchedEffect
         WakeBus.req = false
+        if (!live.running && !off.active && micOk(ctx) && (!Net.online(ctx) || prefs.getBoolean("offlineOnly", false))) { off.start(); return@LaunchedEffect }
         if (!live.running && key().isNotBlank() && micOk(ctx)) {
             live.gfMode = prefs.getBoolean("gf", true); live.callName = prefs.getString("call", "Sir") ?: "Sir"
             live.idleStopMs = 45000
@@ -229,13 +233,13 @@ fun DivyaApp(ctx: Context) {
         if (live.running) act?.moveTaskToBack(true) else act?.finish()
     }
     // App sach mein band ho (swipe/finish) to session aur glow saaf band karo, leak na ho
-    DisposableEffect(Unit) { onDispose { if ((ctx as? android.app.Activity)?.isFinishing == true) live.stop() } }
+    DisposableEffect(Unit) { onDispose { if ((ctx as? android.app.Activity)?.isFinishing == true) { live.stop(); off.release() } } }
     // Divya ne voice se "preview dikhao" bola -> Preview screen
     LaunchedEffect(CodeBus.previewTick) { if (CodeBus.previewTick > 0 && CodeBus.previewProject != null) screen = Screen.Preview }
 
     // System-wide neon glow (sab apps ke upar) jab Divya sun rahi ho
     val glowOn = remember(screen) { prefs.getBoolean("glow", true) }
-    val micNow = live.micOn
+    val micNow = live.micOn || off.active
     val runningNow = live.running
     LaunchedEffect(status, micNow, runningNow, glowOn) {
         val svc = DivyaService.instance ?: return@LaunchedEffect
@@ -250,15 +254,15 @@ fun DivyaApp(ctx: Context) {
     Column(Modifier.fillMaxSize().systemBarsPadding()) {
         Box(Modifier.weight(1f)) {
             when (screen) {
-                Screen.Home -> if (th.neon) NeonHome(th, status, live.micOn, prefs.getString("call", "Sir") ?: "Sir", tapMic, {
+                Screen.Home -> if (th.neon) NeonHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic, {
                     // Avatar par tap: agla avatar design (Neon, 3D, Anime, Blue, Gold, Pink)
                     val n = themes.indices.filter { themes[it].neon }
                     val next = n[(n.indexOf(themeIdx) + 1) % n.size]
                     themeIdx = next; prefs.edit().putInt("theme2", next).apply()
                     android.widget.Toast.makeText(ctx, "Avatar: " + themes[next].name, android.widget.Toast.LENGTH_SHORT).show()
                 }) { screen = it }
-                    else if (th.maya) HomeMaya(th, status, live.micOn, prefs, { screen = it }) { t -> ProBus.pending = t; screen = Screen.Chat }
-                    else Home(th, status, live.micOn, tapMic) { screen = Screen.Chat }
+                    else if (th.maya) HomeMaya(th, status, micNow, prefs, { screen = it }) { t -> ProBus.pending = t; screen = Screen.Chat }
+                    else Home(th, status, micNow, tapMic) { screen = Screen.Chat }
                 Screen.Chat -> ProChatScreen(th) { screen = Screen.Code }
                 Screen.Journal -> JournalScreen(th, prefs)
                 Screen.Study -> StudyScreen(th)
@@ -275,8 +279,8 @@ fun DivyaApp(ctx: Context) {
                 Screen.About -> AboutScreen(th)
             }
         }
-        if (th.neon) NeonNav(screen, live.micOn, tapMic) { screen = it }
-        else if (th.maya) MayaNav(th, screen, live.micOn, tapMic) { screen = it }
+        if (th.neon) NeonNav(screen, micNow, tapMic) { screen = it }
+        else if (th.maya) MayaNav(th, screen, micNow, tapMic) { screen = it }
         else Row(Modifier.fillMaxWidth().padding(10.dp).clip(RoundedCornerShape(22.dp))
             .background(th.accent.copy(alpha = 0.18f)).padding(vertical = 8.dp), Arrangement.SpaceEvenly) {
             th.menu.forEach { (label, target, icon) ->
@@ -287,7 +291,7 @@ fun DivyaApp(ctx: Context) {
             }
         }
     }
-    if (glowOn) GlowBorder(if (live.micOn) Color(0xFF00FF40) else th.accent, live.micOn)
+    if (glowOn) GlowBorder(if (micNow) Color(0xFF00FF40) else th.accent, micNow)
     // Live screen sharing ka chhota button (session chalu hone par dikhta hai). ON hone par Divya aapki screen dekhti rehti hai.
     if (live.running && screen != Screen.Scan && screen != Screen.Chat) {
         Box(Modifier.align(Alignment.TopEnd).systemBarsPadding().padding(top = 4.dp, end = 10.dp)
@@ -513,6 +517,11 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("Safety: phone locked ho to Divya koi kaam na kare (sirf aap unlock karke chalao)", color = th.text, modifier = Modifier.weight(1f))
         Switch(nu, { nu = it; prefs.edit().putBoolean("needUnlock", it).apply() })
+    }
+    var oo by remember { mutableStateOf(prefs.getBoolean("offlineOnly", false)) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Hamesha Offline mode (internet ho tab bhi phone par hi chalo, Gemini nahi)", color = th.text, modifier = Modifier.weight(1f))
+        Switch(oo, { oo = it; prefs.edit().putBoolean("offlineOnly", it).apply() })
     }
     // ---------- Voice Lock (basic) ----------
     var vpOn by remember { mutableStateOf(prefs.getBoolean("voiceLock", false)) }
