@@ -63,7 +63,7 @@ enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, J
 
 class UiTheme(
     val name: String, val img: Int, val circle: Boolean, val bg: Brush, val text: Color, val accent: Color,
-    val greet: String, val menu: List<Triple<String, Screen, ImageVector>>, val hud: Boolean = false, val maya: Boolean = false, val neon: Boolean = false
+    val greet: String, val menu: List<Triple<String, Screen, ImageVector>>, val hud: Boolean = false, val maya: Boolean = false, val neon: Boolean = false, val ice: Boolean = false
 )
 
 val themes = listOf(
@@ -133,7 +133,11 @@ val themes = listOf(
         "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), neon = true),
     UiTheme("Pink Cute", R.drawable.divya_av_pink, false,
         Brush.verticalGradient(listOf(Color(0xFF1A0010), Color(0xFF5A0A3C), Color(0xFF1A0010))), Color.White, Color(0xFFFF5CA8),
-        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), neon = true)
+        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), neon = true),
+    // Ice Light: halka (light) neon-glass theme, poori-height Divya model + dono taraf glass tiles (reference photo se)
+    UiTheme("Ice Light", R.drawable.divya_ice, false,
+        Brush.verticalGradient(listOf(Color(0xFFCFE4FF), Color(0xFFE6F1FF), Color(0xFFF6FAFF))), Color(0xFF0B1B3F), Color(0xFF1E90FF),
+        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), ice = true)
 )
 
 class MainActivity : ComponentActivity() {
@@ -193,7 +197,7 @@ fun DivyaApp(ctx: Context) {
     }
     // Ek baar: purani saved "glow OFF" value ko ON kar do (v2.0 se glow default ON hai)
     if (!prefs.getBoolean("glowV2", false)) prefs.edit().putBoolean("glow", true).putBoolean("glowV2", true).apply()
-    var themeIdx by remember { mutableStateOf(prefs.getInt("theme2", 5).coerceIn(0, themes.lastIndex)) }
+    var themeIdx by remember { mutableStateOf(prefs.getInt("theme2", themes.lastIndex).coerceIn(0, themes.lastIndex)) }
     var screen by remember { mutableStateOf(Screen.Home) }
     var status by remember { mutableStateOf("Tap to Talk") }
     val msgs = remember { mutableStateListOf<Pair<String, String>>() }
@@ -295,7 +299,8 @@ fun DivyaApp(ctx: Context) {
                 },
                 label = "screen"
             ) { s -> when (s) {
-                Screen.Home -> if (th.neon) NeonHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic, {
+                Screen.Home -> if (th.ice) IceHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
+                    else if (th.neon) NeonHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic, {
                     // Avatar par tap: agla avatar design (Neon, 3D, Anime, Blue, Gold, Pink)
                     val n = themes.indices.filter { themes[it].neon }
                     val next = n[(n.indexOf(themeIdx) + 1) % n.size]
@@ -322,7 +327,8 @@ fun DivyaApp(ctx: Context) {
                 Screen.Backup -> BackupScreen(th, ctx)
             } }
         }
-        if (th.neon) NeonNav(screen, micNow, tapMic) { screen = it }
+        if (th.ice) NeonNav(screen, micNow, tapMic, th.accent, true) { screen = it }
+        else if (th.neon) NeonNav(screen, micNow, tapMic) { screen = it }
         else if (th.maya) MayaNav(th, screen, micNow, tapMic) { screen = it }
         else Row(Modifier.fillMaxWidth().padding(10.dp).clip(RoundedCornerShape(22.dp))
             .background(th.accent.copy(alpha = 0.18f)).padding(vertical = 8.dp), Arrangement.SpaceEvenly) {

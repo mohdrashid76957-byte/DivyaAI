@@ -269,3 +269,8 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
   3. Sirf exact "divya" pakadti thi. Ab "diviya, dibya, dhivya, diva, divyaa, दिव्य..." aur "wake up" ke saath 2 akshar tak galti bhi chalti hai ("diya" jaise aam shabd se nahi jagti).
 - Debug: logcat mein filter `WakeService` - "heard: [...]" dikhta hai ki phone ne kya suna, aur "WAKE!" jab jaag gayi.
 - Manifest: USE_FULL_SCREEN_INTENT joda. Naya file SessionControl.kt. Version 2.16.1 (versionCode 36).
+
+## v2.19 - Ice Light theme
+- Naya **Ice Light** theme (light blue/white background) + naya full-height Divya model (`res/drawable/divya_ice.png`, reference photo se cutout).
+- Layout: upar Divya AI orb + speech bubble + Tap to Talk, beech mein model, left/right glass tiles, neeche blue nav bar. Code: `IceHome.kt`.
+- Fresh install par ye default hai. Pehle se app chal rahi ho to Settings > UI Design > "Ice Light" chuno.

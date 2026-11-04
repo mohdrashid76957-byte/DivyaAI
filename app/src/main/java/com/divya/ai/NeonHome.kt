@@ -155,8 +155,8 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
 }
 
 @Composable
-private fun NeonNavItem(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
-    val c = if (selected) NeonPurple else Color.White.copy(alpha = 0.6f)
+private fun NeonNavItem(icon: ImageVector, label: String, selected: Boolean, sel: Color, onClick: () -> Unit) {
+    val c = if (selected) sel else Color.White.copy(alpha = 0.6f)
     Column(Modifier.clickable { onClick() }.padding(horizontal = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, label, tint = c)
         Text(label, color = c, fontSize = 11.sp)
@@ -164,18 +164,19 @@ private fun NeonNavItem(icon: ImageVector, label: String, selected: Boolean, onC
 }
 
 @Composable
-fun NeonNav(screen: Screen, live: Boolean, onMic: () -> Unit, go: (Screen) -> Unit) {
+fun NeonNav(screen: Screen, live: Boolean, onMic: () -> Unit, accent: Color = NeonPurple, blue: Boolean = false, go: (Screen) -> Unit) {
+    val edge = if (blue) Brush.horizontalGradient(listOf(Color(0xFF4DB8FF), Color(0xFF2F7BFF))) else NeonEdge
     Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp).clip(RoundedCornerShape(26.dp))
-        .background(Color(0xFF0B0426)).border(1.5.dp, NeonEdge, RoundedCornerShape(26.dp)).padding(vertical = 6.dp),
+        .background(if (blue) Color(0xFF0B1B3F) else Color(0xFF0B0426)).border(1.5.dp, edge, RoundedCornerShape(26.dp)).padding(vertical = 6.dp),
         Arrangement.SpaceEvenly, Alignment.CenterVertically) {
-        NeonNavItem(Icons.Filled.Home, "Home", screen == Screen.Home) { go(Screen.Home) }
-        NeonNavItem(Icons.Filled.History, "History", screen == Screen.Chat) { go(Screen.Chat) }
-        Box(Modifier.size(56.dp).clip(CircleShape).background(Color(0xFF14043A)).border(2.dp, NeonEdge, CircleShape).clickable { onMic() },
+        NeonNavItem(Icons.Filled.Home, "Home", screen == Screen.Home, accent) { go(Screen.Home) }
+        NeonNavItem(Icons.Filled.History, "History", screen == Screen.Chat, accent) { go(Screen.Chat) }
+        Box(Modifier.size(56.dp).clip(CircleShape).background(if (blue) Color(0xFF0E2656) else Color(0xFF14043A)).border(2.dp, edge, CircleShape).clickable { onMic() },
             contentAlignment = Alignment.Center) {
             if (live) Icon(Icons.Filled.Stop, "Stop", tint = Color.White) else Text("👑", fontSize = 26.sp)
         }
-        NeonNavItem(Icons.Filled.Apps, "Tools", screen == Screen.Quick) { go(Screen.Quick) }
-        NeonNavItem(Icons.Filled.Info, "About", screen == Screen.About) { go(Screen.About) }
+        NeonNavItem(Icons.Filled.Apps, "Tools", screen == Screen.Quick, accent) { go(Screen.Quick) }
+        NeonNavItem(Icons.Filled.Info, "About", screen == Screen.About, accent) { go(Screen.About) }
     }
 }
 
