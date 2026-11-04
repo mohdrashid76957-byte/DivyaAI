@@ -24,7 +24,7 @@ object CodeGen {
 
     private fun model(c: Context) = ProEngine.fastModel(c)
 
-    /** Ek baar bhejo (5xx / timeout par ek retry). JSON text wapas. Errors samajhne layak Hindi-English mein. */
+    /** Gemini ko bhejo. Model busy (503/500/429) ya timeout ho to thoda ruk kar dobara, aur dusre model par bhi (max 6 koshish). Errors Hindi-English mein. */
     private fun ask(c: Context, system: String, user: String): String {
         val key = c.getSharedPreferences("divya", 0).getString("key", "") ?: ""
         if (key.isBlank()) throw GenError("Gemini API key nahi hai. Settings mein daalo.")
@@ -32,21 +32,25 @@ object CodeGen {
             .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
             .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", user)))))
             .put("generationConfig", JSONObject().put("responseMimeType", "application/json").put("temperature", 0.7)).toString()
-        val req = Request.Builder()
-            .url("https://generativelanguage.googleapis.com/v1beta/models/${model(c)}:generateContent")
-            .header("x-goog-api-key", key)                       // key URL/log mein nahi jaati
-            .post(body.toRequestBody("application/json".toMediaType())).build()
         var last: Exception? = null
-        for (attempt in 1..2) {
+        var mdl = model(c)
+        val tried = mutableSetOf<String>()
+        for (attempt in 1..6) {
+            tried.add(mdl)
+            val req = Request.Builder()
+                .url("https://generativelanguage.googleapis.com/v1beta/models/$mdl:generateContent")
+                .header("x-goog-api-key", key)                       // key URL/log mein nahi jaati
+                .post(body.toRequestBody("application/json".toMediaType())).build()
+            var switchModel = false
             try {
                 http.newCall(req).execute().use { r ->
                     val txt = r.body?.string() ?: ""
                     when {
                         r.code == 400 && txt.contains("API key", true) -> throw GenError("API key galat hai (Settings mein check karo).")
                         r.code == 401 || r.code == 403 -> throw GenError("API key reject hui ya permission nahi (${r.code}).")
-                        r.code == 404 -> throw GenError("Model '${model(c)}' nahi mila. Settings mein codeModel badlo.")
-                        r.code == 429 -> throw GenError("API limit/quota khatam. Thodi der baad try karo.")
-                        r.code >= 500 -> { last = GenError("Gemini server error ${r.code}"); Log.w(TAG, "server ${r.code}, retry") }
+                        r.code == 404 -> { last = GenError("Model '$mdl' nahi mila"); switchModel = true }
+                        r.code == 429 -> { last = GenError("API limit/quota (429) model $mdl"); switchModel = true }
+                        r.code >= 500 -> { last = GenError("Gemini server error ${r.code} (model $mdl busy)"); switchModel = attempt >= 2; Log.w(TAG, "server ${r.code} on $mdl, retry $attempt") }
                         !r.isSuccessful -> throw GenError("API error ${r.code}: ${txt.take(150)}")
                         else -> {
                             val parts = JSONObject(txt).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
@@ -56,9 +60,13 @@ object CodeGen {
                     }
                 }
             } catch (e: GenError) { throw e
-            } catch (e: java.io.IOException) { last = e; Log.w(TAG, "network error, attempt $attempt", e) }
+            } catch (e: java.io.IOException) { last = e; switchModel = attempt >= 2; Log.w(TAG, "network error, attempt $attempt", e) }
+            if (switchModel) ProEngine.fallbackModel(c, tried, false)?.let { mdl = it }
+            if (attempt < 6) try { Thread.sleep(1500L * attempt) } catch (_: InterruptedException) { break }
         }
-        throw GenError("Internet/timeout problem: ${last?.message}")
+        val l = last?.message ?: ""
+        throw GenError(if (l.contains("429")) "API limit/quota khatam. Thodi der baad try karo."
+            else "Google ke servers abhi busy hain (${tried.joinToString()} try kiye): $l. 1-2 minute baad dobara bolo.")
     }
 
     private fun parse(raw: String): JSONObject {
