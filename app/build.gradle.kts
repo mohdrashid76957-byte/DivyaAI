@@ -5,10 +5,12 @@ android {
     defaultConfig { applicationId = "com.divya.ai"; minSdk = 26; targetSdk = 34; versionCode = 39; versionName = "2.16.4" }
     signingConfigs {
         getByName("debug") {
+            if (file("divya.keystore").exists()) {
             storeFile = file("divya.keystore")
             storePassword = "divya123"
             keyAlias = "divya"
             keyPassword = "divya123"
+            }
         }
     }
     buildFeatures { compose = true }

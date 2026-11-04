@@ -193,7 +193,7 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - Update ZIP flow wahi hai: badli hui file ka naam message mein likho taaki wo poori jaye (jaise "OfflineBrain.kt mein ye fix karo").
 
 ## v2.9.0 - Privacy password (family app)
-- Naye install par (ya uninstall ke baad dobara install par) pehle Privacy screen aati hai; password `divyarashid` daalo. Ek baar sahi hone ke baad dobara nahi poochhti.
+- Naye install par (ya uninstall ke baad dobara install par) pehle Privacy screen aati hai; apna privacy password daalo. Ek baar sahi hone ke baad dobara nahi poochhti.
 - Bina password: Gemini/Offline voice, wake word, scheduler start nahi hote.
 - Password plain text nahi, salted SHA-256 hash (`License.kt` > `LicenseGate.HASH`). 5 galat koshish par 30 sec lock.
 - Manifest mein `allowBackup=false`, taaki reinstall par Google backup se unlock wapas na aa jaye.

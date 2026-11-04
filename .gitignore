@@ -1,0 +1,9 @@
+*.keystore
+*.jks
+local.properties
+build/
+.gradle/
+.idea/
+*.apk
+*.aab
+.DS_Store

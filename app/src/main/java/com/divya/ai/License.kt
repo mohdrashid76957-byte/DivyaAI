@@ -27,7 +27,7 @@ import java.security.MessageDigest
  */
 object LicenseGate {
     private const val SALT = "divya-lic-v1|"
-    private const val HASH = "3f21c8c5a53acef3e0ed2f0c582907f46bc7779e14cb2bad32235ae4333d3820"   // "divyarashid"
+    private const val HASH = "3f21c8c5a53acef3e0ed2f0c582907f46bc7779e14cb2bad32235ae4333d3820"
     private const val MAX_TRIES = 5
     private const val LOCK_MS = 30_000L
 

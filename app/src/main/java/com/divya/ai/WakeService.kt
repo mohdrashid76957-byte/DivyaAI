@@ -42,13 +42,29 @@ class WakeService : Service() {
 
     override fun onBind(i: Intent?): IBinder? = null
 
+    private var lastStatus = ""
+    private fun note(text: String): Notification =
+        Notification.Builder(this, "wake").setContentTitle("Divya sun rahi hai")
+            .setContentText(text).setSmallIcon(android.R.drawable.ic_btn_speak_now).setOnlyAlertOnce(true)
+            .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)).build()
+    /** Debug: notification mein dikhao ki phone ne kya suna / kaunsa error aaya (logcat ke bina bhi dikhe). */
+    private fun status(t: String) {
+        if (t == lastStatus) return
+        lastStatus = t
+        try { getSystemService(NotificationManager::class.java).notify(77, note(t)) } catch (_: Exception) {}
+    }
+    private fun errName(e: Int) = when (e) {
+        1 -> "network timeout"; 2 -> "network"; 3 -> "audio"; 4 -> "server"; 5 -> "client"
+        6 -> "kuch bola nahi (timeout)"; 7 -> "samajh nahi aaya"; 8 -> "recognizer busy (mic kisi aur ke paas)"
+        9 -> "mic permission"; 10 -> "too many requests"; 11 -> "server disconnected"
+        12 -> "language not supported"; 13 -> "language unavailable"; else -> "error $e"
+    }
+
     override fun onStartCommand(i: Intent?, f: Int, id: Int): Int {
         if (!LicenseGate.isActive(this)) { stopSelf(); return START_NOT_STICKY }
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel("wake", "Divya wake word", NotificationManager.IMPORTANCE_MIN))
-        val n = Notification.Builder(this, "wake").setContentTitle("Divya sun rahi hai")
-            .setContentText("\"Wake up Divya\" bolo").setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)).build()
+        val n = note("\"Wake up Divya\" bolo")
         try { startForeground(77, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) } catch (e: Exception) { stopSelf(); return START_NOT_STICKY }
         dead = false; h.removeCallbacksAndMessages(null); h.post { loop() }
         return START_STICKY
@@ -81,7 +97,7 @@ class WakeService : Service() {
             fun check(b: Bundle?): Boolean {
                 if (my != gen || WakeBus.liveActive) return false   // session chal raha hai to wake mat karo
                 val l = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: return false
-                Log.d("WakeService", "heard: $l")
+                Log.d("WakeService", "heard: $l"); status("suna: " + (l.firstOrNull() ?: "").take(40))
                 if (l.any { matches(it) }) { wake(); return true }
                 return false
             }
@@ -89,6 +105,7 @@ class WakeService : Service() {
             override fun onResults(b: Bundle?) { if (my == gen && !check(b)) next(250) }
             override fun onError(e: Int) {
                 if (my != gen) return                           // purana recognizer (releaseMic ke baad) - ignore
+                status("error $e: " + errName(e) + " [" + (langs[li.coerceIn(0, langs.size - 1)] ?: "default") + "]")
                 Log.w("WakeService", "error $e" + if (e == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) " (mic kisi aur app ke paas hai, jaise Maya)" else "")
                 // 12 = LANGUAGE_NOT_SUPPORTED, 13 = LANGUAGE_UNAVAILABLE: agli language try karo, turant
                 if (e == 12 || e == 13) { if (li < langs.size - 1) li++; next(400); return }
@@ -100,7 +117,7 @@ class WakeService : Service() {
                 }
                 next(d)
             }
-            override fun onReadyForSpeech(p: Bundle?) {}
+            override fun onReadyForSpeech(p: Bundle?) { status("sun rahi hoon... bolo: Wake up Divya") }
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(v: Float) {}
             override fun onBufferReceived(b: ByteArray?) {}
@@ -142,7 +159,7 @@ class WakeService : Service() {
             val n = Notification.Builder(this, "wakeopen").setContentTitle("Divya ne suna 👂")
                 .setContentText("Tap karo, Divya shuru ho jayegi").setSmallIcon(android.R.drawable.ic_btn_speak_now)
                 .setContentIntent(pi).setFullScreenIntent(pi, true).setAutoCancel(true).setTimeoutAfter(20000).build()
-            nm.notify(78, n)
+            nm.notify(79, n)
         } catch (e: Exception) { Log.w("WakeService", "notif fail: ${e.message}") }
     }
 
