@@ -142,7 +142,7 @@ object ProEngine {
         code == 401 || code == 403 -> "API key reject hui ya permission nahi ($code)."
         code == 404 -> "Model '$model' nahi mila. Pro Chat ⚙ mein model ID khali chhod do (auto chunega)."
         code == 503 || code == 500 -> "Google ke models abhi busy hain (high demand). Try kiye: ${(tried + model).distinct().joinToString()}. ⚙ > '🔍 Models test' se dekho kaun sa chal raha hai, ya 1-2 minute baad dobara bhejo."
-        code == 429 -> "API limit/quota khatam (free key mein ~10 requests/min hoti hain). Thodi der baad try karo ya Project mode ki parallel files kam karo (⚙)."
+        code == 429 -> "Google ki free API limit khatam (free key: ~10 requests/min aur roz ka limit). 1-2 minute ruk kar bhejo. Limit hataane ka ek hi pakka tarika: Google AI Studio me billing (pay-as-you-go) on karo - tab limit bahut badh jaati hai. Project mode ki parallel files (⚙) kam rakhna bhi madad karta hai."
         else -> "API error $code: ${(try { JSONObject(txt).optJSONObject("error")?.optString("message").orEmpty() } catch (_: Exception) { "" }).ifBlank { txt }.take(160)}"
     })
 
@@ -481,7 +481,7 @@ object ZipOut {
     }
 
     /** Original (upload kiya hua) ZIP + jawab ke badle hue files = naya updated ZIP. Returns (file, summary). */
-    fun exportMerged(c: Context, text: String, base: java.io.File): Pair<java.io.File, String>? {
+    fun exportMerged(c: Context, text: String, base: java.io.File, origName: String = ""): Pair<java.io.File, String>? {
         val blocks = parse(text).filter { it.third }
         if (blocks.isEmpty() || !base.exists()) return null
         val names = ArrayList<String>()
@@ -492,7 +492,9 @@ object ZipOut {
             val hit = names.filter { it == p || it.endsWith("/$p") }.minByOrNull { it.length }
             if (hit != null) repl[hit] = body else added[root + p] = body
         }
-        val out = java.io.File(java.io.File(c.cacheDir, "share").apply { mkdirs() }, base.nameWithoutExtension.take(40) + "-updated.zip")
+        // Naam wahi jo user ne upload kiya tha (jaise DivyaAI_v2_18.zip); nahi mila to base file ka naam
+        val outName = origName.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { base.name }.let { if (it.lowercase().endsWith(".zip")) it else "$it.zip" }
+        val out = java.io.File(java.io.File(c.cacheDir, "share").apply { mkdirs() }, outName)
         java.util.zip.ZipOutputStream(out.outputStream()).use { zo ->
             java.util.zip.ZipInputStream(base.inputStream()).use { zi ->
                 var e = zi.nextEntry

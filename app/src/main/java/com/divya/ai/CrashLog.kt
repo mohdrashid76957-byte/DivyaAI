@@ -32,4 +32,4 @@ object CrashLog {
     fun clear(c: Context) { try { file(c).delete() } catch (_: Throwable) {} }
 }
 
-object BuildConfigVersion { const val NAME = "2.16.2" }
+object BuildConfigVersion { const val NAME = "2.16.3" }

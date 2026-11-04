@@ -150,7 +150,7 @@ object ProState {
     fun send(c: Context, text: String, atts: List<PAtt>) {
         if (busy || (text.isBlank() && atts.isEmpty())) return
         val u = PMsg("user", text.trim(), atts)
-        atts.firstOrNull { it.zipFile != null }?.zipFile?.let { baseZip = it; c.getSharedPreferences("divya", 0).edit().putString("proBaseZip", it.absolutePath).apply() }
+        atts.firstOrNull { it.zipFile != null }?.let { at -> val it = at.zipFile!!; baseZip = it; c.getSharedPreferences("divya", 0).edit().putString("proBaseZip", it.absolutePath).putString("proBaseName", at.name).apply() }
         msgs.add(u)
         go(c, text.trim().startsWith("/project") || projectMode, text.trim().removePrefix("/project").trim())
         projectMode = false
@@ -316,7 +316,7 @@ private val BIN_EXT = setOf("png", "jpg", "jpeg", "gif", "webp", "ico", "keystor
 
 /** ZIP ko text mein badalo (binary/build/.git chhod kar). Original ZIP cache mein rakhte hain taaki baad mein "Updated ZIP" bane. */
 private fun zipAtt(c: Context, uri: Uri, name: String): PAtt {
-    val dir = java.io.File(c.cacheDir, "base").apply { mkdirs() }
+    val dir = java.io.File(c.filesDir, "base").apply { mkdirs() }
     val f = java.io.File(dir, name.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "project.zip" })
     c.contentResolver.openInputStream(uri)?.use { i -> f.outputStream().use { o -> i.copyTo(o) } } ?: throw AttErr("ZIP khul nahi payi")
     val sb = StringBuilder(); var count = 0; var skipped = 0; var capped = false
@@ -449,7 +449,9 @@ fun ProChatScreen(th: UiTheme, openCode: () -> Unit) {
                                 Icon(Icons.Filled.Refresh, "Dobara", tint = th.text.copy(alpha = 0.7f), modifier = Modifier.size(18.dp)) }
                             val base = ProState.baseZip
                             if (base != null && ZipOut.hasCode(m.text)) AssistChip({
-                                val r = try { ZipOut.exportMerged(ctx, m.text, base) } catch (e: Exception) { null }
+                                val allText = msgs.take(msgs.indexOf(m) + 1).filter { it.role != "user" }.joinToString("\n\n") { it.text }
+                                val origName = ctx.getSharedPreferences("divya", 0).getString("proBaseName", "") ?: ""
+                                val r = try { ZipOut.exportMerged(ctx, allText, base, origName) } catch (e: Exception) { null }
                                 if (r == null) Toast.makeText(ctx, "Is jawab mein path wali file nahi mili (Divya se bolo: har file ka path likhkar do)", Toast.LENGTH_LONG).show()
                                 else {
                                     val n = ZipOut.saveFileToDownloads(ctx, r.first)
@@ -458,7 +460,7 @@ fun ProChatScreen(th: UiTheme, openCode: () -> Unit) {
                                 }
                             }, { Text("🔄 Updated ZIP", fontSize = 12.sp) })
                             val pr = m.project
-                            if (pr == null && ZipOut.hasCode(m.text)) AssistChip({ ProState.exportReply(ctx, m) }, { Text("📦 Code ka ZIP", fontSize = 12.sp) })
+                            if (pr == null && base == null && ZipOut.hasCode(m.text)) AssistChip({ ProState.exportReply(ctx, m) }, { Text("📦 Code ka ZIP", fontSize = 12.sp) })
                             if (pr != null) {
                                 AssistChip({ try { ZipOut.share(ctx, pr) } catch (e: Exception) { Toast.makeText(ctx, "Share nahi hua: ${e.message}", Toast.LENGTH_LONG).show() } }, { Text("📤 ZIP share", fontSize = 12.sp) })
                                 AssistChip({
