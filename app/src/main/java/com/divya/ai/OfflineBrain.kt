@@ -472,7 +472,7 @@ class OfflineBrain(
         }
 
         // --- band karo ---
-        if (t == "stop" || t == "bas" || t == "बस" || t == "bye" || t == "बाय" ||
+        if (SessionControl.isStop(t) || t == "stop" || t == "bas" || t == "बस" || t == "bye" || t == "बाय" ||
             has(t, "offline band", "sunna band", "सुनना बंद", "alvida", "अलविदा", "goodbye", "good bye")) return null
 
         // --- baat-cheet ---

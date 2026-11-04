@@ -62,7 +62,7 @@ class WakeService : Service() {
         listen()
     }
 
-    private fun matches(t: String): Boolean { val s = t.lowercase(); return keys.any { s.contains(it) } }
+    private fun matches(t: String): Boolean = SessionControl.isWake(t) || keys.any { t.lowercase().contains(it) }
 
     /** Recognizer band karo aur purane callbacks ko invalid karo. */
     private fun releaseMic() {
@@ -86,7 +86,7 @@ class WakeService : Service() {
                 return false
             }
             override fun onPartialResults(b: Bundle?) { check(b) }
-            override fun onResults(b: Bundle?) { if (my == gen && !check(b)) next(800) }
+            override fun onResults(b: Bundle?) { if (my == gen && !check(b)) next(250) }
             override fun onError(e: Int) {
                 if (my != gen) return                           // purana recognizer (releaseMic ke baad) - ignore
                 Log.w("WakeService", "error $e" + if (e == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) " (mic kisi aur app ke paas hai, jaise Maya)" else "")
@@ -95,7 +95,7 @@ class WakeService : Service() {
                 val d = when (e) {
                     SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 4000L
                     SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> 15000L
-                    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> 1800L
+                    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> 400L
                     else -> 3000L
                 }
                 next(d)
@@ -121,11 +121,29 @@ class WakeService : Service() {
         releaseMic()                                // wake hone par mic turant chhod do
         WakeBus.liveActive = true
         WakeBus.req = true
+        Log.d("WakeService", "WAKE! activity khol rahi hoon")
+        val i = Intent(this, MainActivity::class.java).putExtra("wake", true)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        // Android background se activity kholne nahi deta. Accessibility service ko chhoot milti hai (wahi se app/WhatsApp khulte hain), isliye pehle wahi.
+        var ok = false
+        try { DivyaService.instance?.let { it.startActivity(i); ok = true } } catch (e: Exception) { Log.w("WakeService", "a11y launch fail: ${e.message}") }
+        if (!ok) try { startActivity(i) } catch (e: Exception) { Log.w("WakeService", "service launch fail: ${e.message}") }
+        // Agar 2.5 sec mein bhi app aage nahi aayi (WakeBus.req abhi true) to notification (full-screen / tap) dikhao
+        h.postDelayed({ if (WakeBus.req) showOpenNotification() }, 2500)
+        h.postDelayed({ if (!WakeBus.req) return@postDelayed; WakeBus.liveActive = false; WakeBus.req = false; loop() }, 12000) // agar app khula hi nahi
+    }
+
+    private fun showOpenNotification() {
         try {
-            startActivity(Intent(this, MainActivity::class.java).putExtra("wake", true)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-        } catch (_: Exception) {}
-        h.postDelayed({ if (!WakeBus.req) return@postDelayed; WakeBus.liveActive = false; WakeBus.req = false; loop() }, 8000) // agar app khula hi nahi
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannel(NotificationChannel("wakeopen", "Divya jag gayi", NotificationManager.IMPORTANCE_HIGH))
+            val pi = PendingIntent.getActivity(this, 1, Intent(this, MainActivity::class.java).putExtra("wake", true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val n = Notification.Builder(this, "wakeopen").setContentTitle("Divya ne suna 👂")
+                .setContentText("Tap karo, Divya shuru ho jayegi").setSmallIcon(android.R.drawable.ic_btn_speak_now)
+                .setContentIntent(pi).setFullScreenIntent(pi, true).setAutoCancel(true).setTimeoutAfter(20000).build()
+            nm.notify(78, n)
+        } catch (e: Exception) { Log.w("WakeService", "notif fail: ${e.message}") }
     }
 
     override fun onDestroy() {

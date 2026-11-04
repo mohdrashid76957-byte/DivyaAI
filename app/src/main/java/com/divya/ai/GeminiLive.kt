@@ -54,6 +54,8 @@ class GeminiLive(
     private var lastKey = ""; private var lastModel = ""; private var lastVoice = ""
     @Volatile var idleStopMs = 0L          // >0: itni der chup rehne par session band (wake-word session ke liye)
     @Volatile private var lastAct = 0L
+    @Volatile private var endAfter = false          // 'off ho jao' suna: jawab/alvida ke baad session band
+    private val heard = StringBuilder()
 
     // ---- Voice lock: pichle 6 sec ki mic audio ka ring buffer ----
     private val ring = ByteArray(16000 * 2 * 6)
@@ -92,6 +94,7 @@ class GeminiLive(
         "If he sincerely asks whether you are a human, say honestly that you are an AI. Keep replies very short. SPEED RULES for phone tasks: never narrate steps, never ask permission, act immediately. " +
         "Prefer ONE do_steps call with the whole sequence (open_app, tap, type, submit, scroll_down, wait...). " +
         "To play a song or video on YouTube ALWAYS call play_youtube(query) - it searches and plays by itself. If a step fails or you are unsure what is on screen, call read_screen, then continue. Speak only once at the end, in a few words. " +
+        "STOP: if the user tells you to go off / stop / sleep / be quiet (off ho jao, band ho jao, so jao, bas, chup, bye) call end_session at once and say only a 2-3 word goodbye. " +
         "WHATSAPP: to send a WhatsApp message call whatsapp_message(person, message) - never do it with do_steps. Use the contact name as the user said it (ammi, papa, etc). If it fails with contact not found, ask him for the exact contact name. " +
         "INSTAGRAM: to message someone on Instagram call instagram_message(person, message) with the exact name and the exact words the user dictated (fix only obvious speech-to-text slips). If he did not say what to write, ask once. " +
         "NOTIFICATIONS: when he asks about notifications/messages/'kya aaya', call read_notifications and summarise briefly (who, which app, gist). Read OTPs/codes only if he asks for them. " +
@@ -109,6 +112,7 @@ class GeminiLive(
      {"name":"do_steps","description":"Run a full phone task in ONE call. steps = ordered list of OBJECTS, each exactly like {action: open_app, arg: YouTube} (never plain strings). actions: play_youtube(arg=song/video to search and play), open_app(arg=app name), tap(arg=visible text/label), type(arg=text into focused input), submit (press enter/search/send), scroll_down, scroll_up, wait(arg=ms), home, back, recents, notifications, quick_settings, lock, screenshot","parameters":{"type":"OBJECT","properties":{"steps":{"type":"ARRAY","items":{"type":"OBJECT","properties":{"action":{"type":"STRING"},"arg":{"type":"STRING"}},"required":["action"]}}},"required":["steps"]}},
      {"name":"play_youtube","description":"Search YouTube for a song/video and play the first result automatically","parameters":{"type":"OBJECT","properties":{"query":{"type":"STRING"}},"required":["query"]}},
      {"name":"open_camera","description":"Open Divya's camera/scanner so she can see the real world (objects, text, documents, QR). Call when user says dekho, scan karo, camera kholo, ye kya hai (and camera is not open)."},
+     {"name":"end_session","description":"Stop listening and go back to sleep (wake-word standby). Call this when the user says things like: Divya off ho jao, band ho jao, so jao, bas, chup ho jao, mic band karo, stop, bye, go to sleep.","parameters":{"type":"OBJECT","properties":{}}},
      {"name":"whatsapp_message","description":"Send a WhatsApp message to a contact by name (or phone number). Looks up the contact, opens the chat and presses send. ALWAYS use this for WhatsApp messages instead of do_steps.","parameters":{"type":"OBJECT","properties":{"person":{"type":"STRING"},"message":{"type":"STRING"}},"required":["person","message"]}},
      {"name":"instagram_message","description":"Send an Instagram DM: opens Instagram, finds the person by name, types the message and presses send.","parameters":{"type":"OBJECT","properties":{"person":{"type":"STRING"},"message":{"type":"STRING"}},"required":["person","message"]}},
      {"name":"schedule_task","description":"Schedule a task for LATER (e.g. '3pm par ammi ko call karke bolo mummy aaj main nani ke yaha ja raha hu'). kind=call_and_say (calls the person at that time and speaks the message aloud on speaker), send_whatsapp (sends the WhatsApp message at that time), remind (shows an alarm-style reminder and speaks the message). Give EITHER hour (0-23, 24-hour clock; 3pm=15) + minute, OR in_minutes for relative time like 'das minute baad'. If hour is already past today it is scheduled for tomorrow.","parameters":{"type":"OBJECT","properties":{"kind":{"type":"STRING","enum":["call_and_say","send_whatsapp","remind"]},"person":{"type":"STRING"},"message":{"type":"STRING"},"hour":{"type":"INTEGER"},"minute":{"type":"INTEGER"},"in_minutes":{"type":"INTEGER"}},"required":["kind","message"]}},
@@ -145,7 +149,7 @@ class GeminiLive(
         if (!LicenseGate.isActive(ctx)) { state("Error: License activate karo"); return }
         lastKey = key; lastModel = model; lastVoice = voice
         fastThink = ctx.getSharedPreferences("divya", 0).getBoolean("fastThink", true)
-        ready = false; running = true; WakeBus.liveActive = true; lastAct = System.currentTimeMillis(); mic = withMic; pending = firstText; newTurn = true
+        ready = false; running = true; endAfter = false; heard.setLength(0); WakeBus.liveActive = true; lastAct = System.currentTimeMillis(); mic = withMic; pending = firstText; newTurn = true
         state("Connecting…")
         updateGlow()
         // Background mein bhi mic/session zinda rahe (Android background mein mic band kar deta hai, foreground service se nahi)
@@ -251,15 +255,23 @@ class GeminiLive(
                 sc.optJSONObject("outputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let {
                     val n = newTurn; newTurn = false; main.post { onText(it, n) }
                 }
-                sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let { AvatarBus.moveTo(2); main.post { onHeard(it) } }
+                sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let { AvatarBus.moveTo(2); main.post { onHeard(it) }; heard.append(it).append(' '); if (SessionControl.isStop(heard.toString())) requestEnd() }
                 if (sc.optBoolean("turnComplete")) {
-                    newTurn = true
+                    newTurn = true; heard.setLength(0)
+                    if (endAfter) main.postDelayed({ stop() }, 1800)   // alvida poora bolne do, phir band
                     AvatarBus.moveTo(5)
                     main.postDelayed({ if (AvatarBus.stage == 5) AvatarBus.moveTo(if (micOn) 1 else 0) }, 1500)
                 }
             }
             j.optJSONObject("toolCall")?.optJSONArray("functionCalls")?.let { runTools(it) }
         } catch (e: Exception) { state("Error: ${e.message}") }
+    }
+
+    /** Session band karne ki request: model ka chhota alvida ya 5 sec, jo pehle. Band hone par wake listener wapas chalu. */
+    private fun requestEnd() {
+        if (endAfter) return
+        endAfter = true
+        main.postDelayed({ if (endAfter) stop() }, 5000)
     }
 
     private val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
@@ -280,7 +292,8 @@ class GeminiLive(
                     fun yn(b: Boolean?) = if (b == true) "done" else "failed (not found or accessibility off)"
                     val locked = (ctx.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager).isKeyguardLocked
                     val needUnlock = ctx.getSharedPreferences("divya", 0).getBoolean("needUnlock", true)
-                    when (if (dup) "__dup" else if (gate != null) "__voice" else if (needUnlock && locked) "__locked" else name) {
+                    when (if (name == "end_session") "end_session" else if (dup) "__dup" else if (gate != null) "__voice" else if (needUnlock && locked) "__locked" else name) {
+                        "end_session" -> { requestEnd(); "ok. Ab bas 2-3 shabd mein chhota alvida bolo (jaise \"Theek hai, bye!\"). Koi aur tool mat chalao." }
                         "__dup" -> "already done a moment ago - DO NOT call this again. Just tell the user in a few words that it is done."
                         "__voice" -> gate ?: "blocked"
                         "__locked" -> "phone locked hai - user se kaho pehle phone unlock kare"

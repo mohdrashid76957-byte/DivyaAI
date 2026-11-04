@@ -260,3 +260,12 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
   - Ye ASLI phoneme lip-sync nahi hai. Mooh ke coordinates `lipCfgFor()` mein hain (mx, my, fw, ang) - kam/zyada ho to wahin badlo.
   - Offline mode (Android TTS) mein awaaz ka level nahi milta, wahan mooh nahi hilta.
 - Version 2.16.0 (versionCode 35). Dhyan: ye code Android Studio mein build karke abhi test nahi hua.
+
+## v2.16.1 - Wake up Divya + "Divya off ho jao" fix
+- **Off ho jao / band ho jao / so jao / bas / chup / mic band karo / bye:** ab Divya session band karke wake-word standby mein chali jati hai. Do tarike saath: (1) naya tool `end_session` (model khud bulata hai aur 2-3 shabd ka alvida bolta hai), (2) `SessionControl.isStop()` jo aapki bolti hui transcript par khud pakadta hai (model na bulaye tab bhi). 5 sec mein band hona pakka. "wifi band karo", "gaana stop karo" jaise kaam par band NAHI hoti. Offline mode mein bhi wahi.
+- **Wake up Divya na chalne ke 3 karan theek kiye:**
+  1. App background se aage nahi aati thi (Android background se activity kholne nahi deta). Ab pehle Accessibility service se kholti hai (jaise WhatsApp/apps kholti hai), phir bhi na aaye to 2.5 sec baad "Divya ne suna - tap karo" notification (full-screen intent).
+  2. Sunne ke beech 1.8 sec ka gap tha, usmein bola hua "Divya" chhoot jata tha. Ab 0.25-0.4 sec.
+  3. Sirf exact "divya" pakadti thi. Ab "diviya, dibya, dhivya, diva, divyaa, दिव्य..." aur "wake up" ke saath 2 akshar tak galti bhi chalti hai ("diya" jaise aam shabd se nahi jagti).
+- Debug: logcat mein filter `WakeService` - "heard: [...]" dikhta hai ki phone ne kya suna, aur "WAKE!" jab jaag gayi.
+- Manifest: USE_FULL_SCREEN_INTENT joda. Naya file SessionControl.kt. Version 2.16.1 (versionCode 36).
