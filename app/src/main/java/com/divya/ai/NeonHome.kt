@@ -210,12 +210,15 @@ fun AvatarHero(img: Int, faces: IntArray?, accent: Color, modifier: Modifier) {
             else -> img
         }
         androidx.compose.animation.Crossfade(shown, animationSpec = tween(220), label = "expr") { res ->
-            Image(painterResource(res), "Divya", Modifier.fillMaxSize().graphicsLayer {
+            val mod = Modifier.fillMaxSize().graphicsLayer {
                 translationY = f * 5.dp.toPx() * (if (stage > 0) 1.6f else 1f)
-                val sc = 1f + 0.035f * smooth
+                val sc = 1f + 0.02f * smooth
                 scaleX = sc; scaleY = sc
-                rotationZ = f * (if (speaking) 1.4f else 0.5f)
-            }, contentScale = ContentScale.Fit)
+                rotationZ = f * (if (speaking) 1.2f else 0.5f)
+            }
+            val lip = if (res == img) lipCfgFor(res) else null
+            if (lip != null) LipSyncImage(res, lip, smooth, if (speaking) AvatarBus.shape else 0f, mod)   // mooh awaaz ke saath hilta hai
+            else Image(painterResource(res), "Divya", mod, contentScale = ContentScale.Fit)
         }
     }
 }

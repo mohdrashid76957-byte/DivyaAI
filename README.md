@@ -248,3 +248,15 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - **Rate limit:** ek app se 1 minute mein max 3 announcements.
 - **OTP safety:** OTP / verification code ka text nahi bolegi, sirf batayegi ki code aaya hai.
 - Abhi nahi: WhatsApp auto-reply (jawab khud dene ka risk) aur "koi na bole to so jao".
+
+## v2.16.0 - Website live deploy (Maya jaisa) + avatar lip-sync (procedural)
+- **Website seconds mein LIVE:** Settings > "Website publish" mein Netlify token daalo (free: app.netlify.com > User settings > Applications > Personal access token). Phir bolo: "Divya, mere liye gym ki website banao, WhatsApp button 91XXXXXXXXXX ke saath, live karo aur link Rahul ko WhatsApp par bhejo."
+  - `build_website` ab (1) site banata hai, (2) lint + auto-fix, (3) Netlify zip-deploy API se publish karke public link deta hai. Naya param `whatsapp` = site par floating WhatsApp button (wa.me link), `deploy` = false karo to sirf phone par bane.
+  - Naya tool `deploy_website`: `edit_website` ke baad wahi site update karta hai (site id har project ke liye yaad rehti hai).
+  - Link bhejna: Divya ko link mil jata hai, wo purane `whatsapp_message` tool se bhej deti hai.
+  - README.md / DEPLOY.md public site par upload nahi hote. Token backup mein nahi jata. Deploy.kt naya file.
+- **Lip-sync (procedural):** naya `LipSync.kt`. Divya ki asli awaaz ki loudness se jabda neeche khinchta hai (drawBitmapMesh warp), mooh ke andar daant/zaban, aur awaaz ke zero-crossing se mooh gol/chaudha. `AvatarBus.shape` naya.
+  - 3D Realistic + Anime Neon: jabda + mooh ka andar. Blue / Gold / Pink: sirf halka jabda (photo chhoti aur mooh band hai, andar wala mooh sticker jaisa lagta tha).
+  - Ye ASLI phoneme lip-sync nahi hai. Mooh ke coordinates `lipCfgFor()` mein hain (mx, my, fw, ang) - kam/zyada ho to wahin badlo.
+  - Offline mode (Android TTS) mein awaaz ka level nahi milta, wahan mooh nahi hilta.
+- Version 2.16.0 (versionCode 35). Dhyan: ye code Android Studio mein build karke abhi test nahi hua.

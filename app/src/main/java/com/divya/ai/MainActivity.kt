@@ -508,6 +508,7 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     var model by remember { mutableStateOf(prefs.getString("model", "gemini-3.8-live")!!) }
     var voice by remember { mutableStateOf(prefs.getString("voice", "Aoede")!!) }
     var callName by remember { mutableStateOf(prefs.getString("call", "Sir")!!) }
+    var nlToken by remember { mutableStateOf(prefs.getString("netlifyToken", "") ?: "") }
     var saved by remember { mutableStateOf(false) }
     val colors = OutlinedTextFieldDefaults.colors(focusedTextColor = th.text, unfocusedTextColor = th.text)
     Text("Gemini API Key", color = th.accent, fontWeight = FontWeight.Bold)
@@ -516,7 +517,11 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     OutlinedTextField(model, { model = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Live voice model ID (sabse tez: gemini-3.8-live)") }, colors = colors)
     OutlinedTextField(voice, { voice = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Female voice (Aoede / Kore / Leda / Zephyr)") }, colors = colors)
     OutlinedTextField(callName, { callName = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Divya tumhe kya bulaye (Sir / Boss / naam)") }, colors = colors)
-    Btn(th, "Save") { prefs.edit().putString("key", key.trim()).putString("model", model.trim()).putString("voice", voice.trim()).putString("call", callName.trim().ifBlank { "Sir" }).apply(); saved = true }
+    Text("Website publish (Maya jaisa, seconds mein live link)", color = th.accent, fontWeight = FontWeight.Bold)
+    Text("app.netlify.com par free account > User settings > Applications > Personal access token banao aur yahan daalo. Phir bolo: \"Divya, mere liye portfolio website banao aur live karo\".", color = th.text, fontSize = 12.sp)
+    OutlinedTextField(nlToken, { nlToken = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Netlify token") },
+        visualTransformation = PasswordVisualTransformation(), singleLine = true, colors = colors)
+    Btn(th, "Save") { prefs.edit().putString("netlifyToken", nlToken.trim()).putString("key", key.trim()).putString("model", model.trim()).putString("voice", voice.trim()).putString("call", callName.trim().ifBlank { "Sir" }).apply(); saved = true }
     if (saved) Text("✅ Saved", color = th.accent)
     Btn(th, "Backup & restore (yaadein, chats)") { openBackup() }
     AnnounceSettings(th, prefs)

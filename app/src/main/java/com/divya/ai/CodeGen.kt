@@ -84,11 +84,13 @@ object CodeGen {
         "Every file path must be relative (index.html, style.css, script.js, assets/...). Link css/js correctly from index.html. NEVER include real API keys, passwords or private data; contact forms must be front-end only (mailto: or clearly marked placeholder). " +
         "Use placeholder text the user can edit; images only via inline SVG or CSS gradients (no hotlinked images). Output ONLY JSON."
 
-    fun buildWebsite(c: Context, description: String, kind: String): String = try {
+    fun buildWebsite(c: Context, description: String, kind: String, whatsapp: String = "", deploy: Boolean = true): String = try {
         val sys = "You are a senior web developer. Create a COMPLETE website project from the requirements. $RULES " +
             "JSON shape: {\"project\":\"short-kebab-name\",\"summary\":\"one short sentence in Hinglish\",\"files\":[{\"path\":\"index.html\",\"content\":\"...\"},{\"path\":\"style.css\",...},{\"path\":\"script.js\",...},{\"path\":\"README.md\",...},{\"path\":\"DEPLOY.md\",...}]}. " +
             "DEPLOY.md must give simple step-by-step Hinglish instructions to publish on GitHub Pages (create repo, upload files, Settings > Pages > main branch / root) and Netlify drop as alternative."
-        val j = parse(ask(c, sys, "Website type: $kind\nRequirements: $description"))
+        val wa = whatsapp.filter { it.isDigit() }
+        val waRule = if (wa.length >= 8) "\nMUST include a floating WhatsApp chat button (bottom-right, green, with inline SVG icon) linking to https://wa.me/$wa?text=Hello (opens in new tab), plus a WhatsApp contact link in the contact section." else ""
+        val j = parse(ask(c, sys, "Website type: $kind\nRequirements: $description$waRule"))
         var name = CodeStore.safeName(j.optString("project").ifBlank { kind })
         if (CodeStore.listProjects(c).contains(name)) name += "-" + (System.currentTimeMillis() % 1000)
         val files = writeFiles(c, name, j).toMutableList()
@@ -98,9 +100,11 @@ object CodeGen {
             Log.w(TAG, "lint: $issues")
             try { files += fix(c, name, issues.joinToString("; ")); issues = CodeStore.lint(c, name) } catch (e: GenError) { Log.w(TAG, "auto-fix fail: ${e.message}") }
         }
+        val live = if (deploy && Deploy.hasToken(c)) Deploy.netlify(c, name) else null
         "done: project '$name' bana (${files.distinct().size} files: ${files.distinct().joinToString()}). " + j.optString("summary") +
             (if (issues.isEmpty()) " Koi error nahi mila." else " Bache issues: ${issues.joinToString("; ")}") +
-            " Ab preview_website('$name') chalao aur user ko bolo ki Tools > Code mein edit/share/deploy guide mil jayegi."
+            (if (live != null) " ONLINE: $live" else if (deploy) " Online publish nahi hua kyunki Netlify token set nahi hai - user ko bolo Settings > Website publish mein token daale (free). Tab tak Tools > Code mein ZIP/DEPLOY.md hai." else "") +
+            " Ab preview_website('$name') chalao."
     } catch (e: GenError) { Log.e(TAG, "buildWebsite", e); "failed: ${e.message}" }
     catch (e: Exception) { Log.e(TAG, "buildWebsite", e); "failed: ${e.javaClass.simpleName}: ${e.message}" }
 

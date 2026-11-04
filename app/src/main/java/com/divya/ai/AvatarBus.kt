@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 object AvatarBus {
     var stage by mutableStateOf(0)
     var level by mutableStateOf(0f)
+    var shape by mutableStateOf(0f)         // 0 = gol/khula (aa, oo), 1 = chaudha/patla (ee, s, sh) - awaaz ke zero-crossing se andaza
     var speaking by mutableStateOf(false)   // Divya abhi bol rahi hai (chhote pauses mein bhi true rehta hai)
 
     fun moveTo(s: Int) { if (stage != s) stage = s }
@@ -26,5 +27,17 @@ object AvatarBus {
         if (n == 0) return 0f
         val rms = Math.sqrt(sum / n) / 32768.0
         return (rms * 6.0).coerceIn(0.0, 1.0).toFloat()
+    }
+
+    /** Zero-crossing rate -> 0..1. Zyada = s/sh/ee jaisi tez awaaz (mooh chaudha), kam = aa/oo jaisi gehri awaaz. Andaza hai, asli phoneme nahi. */
+    fun pcmShape(b: ByteArray): Float {
+        var z = 0; var n = 0; var prev = 0; var i = 0
+        while (i + 1 < b.size) {
+            val v = (b[i + 1].toInt() shl 8) or (b[i].toInt() and 0xFF)
+            if (n > 0 && ((v >= 0) != (prev >= 0))) z++
+            prev = v; n++; i += 2
+        }
+        if (n < 8) return 0f
+        return (((z.toFloat() / n) - 0.05f) / 0.20f).coerceIn(0f, 1f)
     }
 }
