@@ -43,6 +43,7 @@ object CodeGen {
                 .header("x-goog-api-key", key)                       // key URL/log mein nahi jaati
                 .post(body.toRequestBody("application/json".toMediaType())).build()
             var switchModel = false
+            quotaMsg = null
             try {
                 http.newCall(req).execute().use { r ->
                     val txt = r.body?.string() ?: ""
@@ -50,7 +51,7 @@ object CodeGen {
                         r.code == 400 && txt.contains("API key", true) -> throw GenError("API key galat hai (Settings mein check karo).")
                         r.code == 401 || r.code == 403 -> throw GenError("API key reject hui ya permission nahi (${r.code}).")
                         r.code == 404 -> { last = GenError("Model '$mdl' nahi mila"); switchModel = true }
-                        r.code == 429 -> { last = GenError("429"); quotaMsg = ProEngine.quotaWhy(txt, mdl); switchModel = true; if (ProEngine.fallbackModel(c, tried + mdl, false) == null) throw GenError(quotaMsg!!) }
+                        r.code == 429 -> { last = GenError("429"); quotaMsg = ProEngine.quotaWhy(txt, mdl); switchModel = true }
                         r.code >= 500 -> { last = GenError("Gemini server error ${r.code} (model $mdl busy)"); switchModel = attempt >= 2; Log.w(TAG, "server ${r.code} on $mdl, retry $attempt") }
                         !r.isSuccessful -> throw GenError("API error ${r.code}: ${txt.take(150)}")
                         else -> {
@@ -62,7 +63,10 @@ object CodeGen {
                 }
             } catch (e: GenError) { throw e
             } catch (e: java.io.IOException) { last = e; switchModel = attempt >= 2; Log.w(TAG, "network error, attempt $attempt", e) }
-            if (switchModel) ProEngine.fallbackModel(c, tried, false)?.let { mdl = it }
+            val qm = quotaMsg
+            val nextModel = if (switchModel) ProEngine.fallbackModel(c, tried, false) else null
+            if (qm != null && nextModel == null) throw GenError("$qm Pakka hal: Google AI Studio me billing on karo.")
+            if (nextModel != null) mdl = nextModel
             if (attempt < 6) try { Thread.sleep(1500L * attempt) } catch (_: InterruptedException) { break }
         }
         val l = last?.message ?: ""
