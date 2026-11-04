@@ -255,7 +255,7 @@ class GeminiLive(
                 sc.optJSONObject("outputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let {
                     val n = newTurn; newTurn = false; main.post { onText(it, n) }
                 }
-                sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let { AvatarBus.moveTo(2); main.post { onHeard(it) }; heard.append(it).append(' '); if (SessionControl.isStop(heard.toString())) requestEnd() }
+                sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let { AvatarBus.moveTo(2); main.post { onHeard(it) }; heard.append(it).append(' '); if (SessionControl.isStop(heard.toString().takeLast(60))) requestEnd() }
                 if (sc.optBoolean("turnComplete")) {
                     newTurn = true; heard.setLength(0)
                     if (endAfter) main.postDelayed({ stop() }, 1800)   // alvida poora bolne do, phir band
@@ -385,6 +385,7 @@ class GeminiLive(
         synchronized(trackLock) { try { track?.release() } catch (_: Exception) {}; track = buildTrack() }
         playQ.clear()
         val t = Thread {
+          try {
             while (running) {
                 val chunk: ByteArray? = try { playQ.poll(200, TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { null }
                 if (chunk == null) { AvatarBus.level = 0f; AvatarBus.speaking = false; if (Thread.currentThread().isInterrupted) break else continue }
@@ -402,6 +403,7 @@ class GeminiLive(
                     }
                 } catch (e: Exception) { android.util.Log.e("DivyaAudio", "playback error", e) }
             }
+          } catch (e: Throwable) { android.util.Log.e("DivyaAudio", "playback thread error", e); CrashLog.note(ctx, "playback thread", e) }
         }
         t.isDaemon = true; playThread = t; t.start()
     }
@@ -481,6 +483,7 @@ class GeminiLive(
             rec = r; r.startRecording(); micOn = true; updateGlow(); AvatarBus.moveTo(1)
             state("🎤 Bolo, Divya sun rahi hai…")
             Thread {
+              try {
                 val buf = ByteArray(1600)
                 val gate = MicGate(ctx)            // Listen mode: Owner only / Owner+family -> dusron ki awaaz Gemini tak nahi jati
                 var gateOn = false; var gateChk = 0L
@@ -496,7 +499,7 @@ class GeminiLive(
                     val now = android.os.SystemClock.uptimeMillis()
                     if (now - gateChk > 1000) {
                         gateChk = now
-                        val g = try { gate.active() } catch (_: Exception) { false }
+                        val g = try { gate.active() } catch (_: Throwable) { false }
                         if (g != gateOn) { gate.reset(); sfill = 0 }
                         gateOn = g
                     }
@@ -508,11 +511,16 @@ class GeminiLive(
                             if (sfill == sbuf.size) {
                                 sfill = 0
                                 try { for (b in gate.feed(sbuf.copyOf()) { ringPut(it, it.size) }) sendAudio(b, b.size) }
-                                catch (e: Exception) { android.util.Log.e("DivyaGate", "gate error", e) }
+                                catch (e: Throwable) { android.util.Log.e("DivyaGate", "gate error", e); gateOn = false; gate.reset() }
                             }
                         }
                     }
                 }
+              } catch (e: Throwable) {
+                android.util.Log.e("DivyaMic", "mic thread error", e)
+                CrashLog.note(ctx, "mic thread", e)
+                state("Mic error: ${e.javaClass.simpleName} ${e.message ?: ""}")
+              }
             }.start()
         } catch (e: Exception) { state("Mic error: ${e.message}") }
     }

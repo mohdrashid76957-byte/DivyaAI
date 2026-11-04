@@ -7,8 +7,8 @@ package com.divya.ai
 object SessionControl {
     private val stopRes = listOf(
         // off/band/chup/ruk/stop + ho jao / raho
-        Regex("(off|ऑफ|band|bandh|बंद|chup|चुप|ruk|रुक|stop|स्टॉप|sleep|bas)\\s*(ho\\s*ja+o|ho\\s*ja+|ho\\s*jaiye|ho\\s*jana|हो\\s*जा(ओ|इए|ना)?|raho|rahiye|रहो|रहिए)"),
-        Regex("so\\s*ja+o|so\\s*ja+\\b|सो\\s*जा(ओ|ना)?|go\\s*to\\s*sleep|sleep\\s*mode|stand\\s*by|standby|good\\s*bye|goodbye|alvida|अलविदा"),
+        Regex("(\\boff|ऑफ|\\bband|\\bbandh|बंद|\\bchup|चुप|\\bruk|रुक|\\bstop|स्टॉप|\\bsleep|\\bbas)\\s*(ho\\s*ja+o|ho\\s*ja+|ho\\s*jaiye|ho\\s*jana|हो\\s*जा(ओ|इए|ना)?|raho|rahiye|रहो|रहिए)"),
+        Regex("\\bso\\s*ja+o|\\bso\\s*ja+\\b|सो\\s*जा(ओ|ना)?|go\\s*to\\s*sleep|sleep\\s*mode|stand\\s*by|standby|good\\s*bye|goodbye|alvida|अलविदा"),
         // Divya + off/band/stop/bye/bas/chup (kisi bhi order mein)
         Regex("(divya|दिव्या|diviya|divia)\\s*,?\\s*(off|ऑफ|bye|बाय|bas|बस|chup|चुप|sleep)"),
         Regex("(off|ऑफ|bye|बाय|bas|बस|chup|चुप)\\s*,?\\s*(divya|दिव्या|diviya|divia)"),

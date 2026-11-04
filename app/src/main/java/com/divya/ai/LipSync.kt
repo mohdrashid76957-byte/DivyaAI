@@ -79,6 +79,7 @@ fun LipSyncImage(res: Int, cfg: LipCfg, level: Float, shape: Float, modifier: Mo
             }
         }
         drawIntoCanvas { cv ->
+          try {
             val nc = cv.nativeCanvas
             nc.drawBitmapMesh(bm, cols, rows, verts, 0, null, 0, paints.bmp)
             if (cfg.cavity && o > 0.06f) {
@@ -93,6 +94,10 @@ fun LipSyncImage(res: Int, cfg: LipCfg, level: Float, shape: Float, modifier: Mo
                 nc.save(); nc.translate(0f, -ry * 0.62f); nc.scale(rx * 0.80f, ry * 0.26f); nc.drawCircle(0f, 0f, 1f, paints.teeth); nc.restore()
                 nc.restore()
             }
+          } catch (e: Throwable) {
+            android.util.Log.e("LipSync", "draw error", e)
+            cv.nativeCanvas.drawBitmap(bm, null, android.graphics.RectF(ox, oy, ox + dw, oy + dh), paints.bmp)
+          }
         }
     }
 }

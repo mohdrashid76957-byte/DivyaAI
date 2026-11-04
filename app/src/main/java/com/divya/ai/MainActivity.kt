@@ -139,6 +139,7 @@ val themes = listOf(
 class MainActivity : ComponentActivity() {
     override fun onCreate(s: Bundle?) {
         super.onCreate(s)
+        CrashLog.install(this)
         if (intent?.getBooleanExtra("wake", false) == true) WakeBus.req = true
         val p = getSharedPreferences("divya", 0)
         if (LicenseGate.isActive(this) && p.getBoolean("wake", false) && micOk(this)) WakeService.start(this)
@@ -149,6 +150,17 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             MaterialTheme {
+                var crash by remember { mutableStateOf(CrashLog.read(this)) }
+                if (crash != null) {
+                    val cm = getSystemService(android.content.ClipboardManager::class.java)
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { CrashLog.clear(this); crash = null },
+                        title = { Text("Pichli baar app gir gayi thi") },
+                        text = { Text(crash!!.take(1500), fontSize = 11.sp, modifier = Modifier.verticalScroll(rememberScrollState())) },
+                        confirmButton = { TextButton({ cm?.setPrimaryClip(android.content.ClipData.newPlainText("crash", crash)); Toast.makeText(this, "Copy ho gaya - Claude ko bhejo", Toast.LENGTH_LONG).show() }) { Text("Copy") } },
+                        dismissButton = { TextButton({ CrashLog.clear(this); crash = null }) { Text("Band karo") } }
+                    )
+                }
                 var unlocked by remember { mutableStateOf(LicenseGate.isActive(this)) }
                 if (unlocked) DivyaApp(this)
                 else Box(Modifier.fillMaxSize().background(Color(0xFF020611))) {
@@ -219,6 +231,7 @@ fun DivyaApp(ctx: Context) {
         if (key().isBlank()) { status = "Settings mein Gemini API key daalo"; screen = Screen.Settings; return }
         if (live.running) { if (live.micOn) live.stop() else live.enableMic(); return }
         live.gfMode = prefs.getBoolean("gf", true); live.callName = prefs.getString("call", "Sir") ?: "Sir"
+        live.idleStopMs = 0L   // wake-word wala 45 sec auto-stop sirf wake session ke liye, manual tap par nahi
         live.start(key(), model(), voice(), true)
     }
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if (it) toggle() }
