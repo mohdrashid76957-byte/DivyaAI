@@ -25,6 +25,9 @@ import kotlin.math.min
  *
  * mx,my = mooh ka center (image ka fraction), fw = mooh ki poori chaurai (image width ka fraction), ang = mooh ka jhukaav (degree).
  */
+/** Mooh-hilne wala effect. Kuch phones par Listening shuru hote hi (Crossfade + drawBitmapMesh) app gira deta tha, isliye abhi OFF. */
+const val LIP_SYNC_ENABLED = false
+
 data class LipCfg(val mx: Float, val my: Float, val fw: Float, val ang: Float, val cavity: Boolean)
 
 fun lipCfgFor(res: Int): LipCfg? = when (res) {

@@ -216,7 +216,7 @@ fun AvatarHero(img: Int, faces: IntArray?, accent: Color, modifier: Modifier) {
                 scaleX = sc; scaleY = sc
                 rotationZ = f * (if (speaking) 1.2f else 0.5f)
             }
-            val lip = if (res == img) lipCfgFor(res) else null
+            val lip = if (LIP_SYNC_ENABLED && res == img) lipCfgFor(res) else null
             if (lip != null) LipSyncImage(res, lip, smooth, if (speaking) AvatarBus.shape else 0f, mod)   // mooh awaaz ke saath hilta hai
             else Image(painterResource(res), "Divya", mod, contentScale = ContentScale.Fit)
         }
