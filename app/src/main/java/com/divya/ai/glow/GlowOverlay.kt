@@ -122,10 +122,10 @@ private class GlowView(ctx: Context) : View(ctx) {
             rect.set(inset, inset, this.width - inset, this.height - inset)
             c.drawRoundRect(rect, r, r, paint)
         }
-        layer(34f * dp, 0.10f)
-        layer(22f * dp, 0.20f)
-        layer(12f * dp, 0.40f)
-        layer(5f * dp, 0.80f)
-        layer(2f * dp, 1.00f)
+        // PATLA neon border (thin line + halka glow)
+        layer(9f * dp, 0.10f)
+        layer(5f * dp, 0.25f)
+        layer(3f * dp, 0.55f)
+        layer(1.5f * dp, 1.00f)
     }
 }

@@ -370,10 +370,10 @@ fun GlowBorder(color: Color, active: Boolean) {
         // purple, blue, cyan, green, pink ... lagataar badalte rang
         val cols = listOf(0f, 60f, 120f, 180f, 240f, 300f).map { Color.hsv((hue + it) % 360f, 0.85f, 1f) }
         val brush = Brush.sweepGradient(cols + cols.first(), center)
-        for (i in 6 downTo 0) {
-            val w = (3 + i * 5).dp.toPx()
+        for (i in 3 downTo 0) {
+            val w = (1.5f + i * 2.5f).dp.toPx()
             drawRoundRect(brush, topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w),
-                cornerRadius = CornerRadius(r), alpha = (a * (0.12f + (6 - i) * 0.14f)).coerceIn(0f, 1f), style = Stroke(w))
+                cornerRadius = CornerRadius(r), alpha = (a * (0.10f + (3 - i) * 0.30f)).coerceIn(0f, 1f), style = Stroke(w))
         }
     }
 }
