@@ -33,6 +33,7 @@ object CodeGen {
             .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", user)))))
             .put("generationConfig", JSONObject().put("responseMimeType", "application/json").put("temperature", 0.7)).toString()
         var last: Exception? = null
+        var quotaMsg: String? = null
         var mdl = model(c)
         val tried = mutableSetOf<String>()
         for (attempt in 1..6) {
@@ -49,7 +50,7 @@ object CodeGen {
                         r.code == 400 && txt.contains("API key", true) -> throw GenError("API key galat hai (Settings mein check karo).")
                         r.code == 401 || r.code == 403 -> throw GenError("API key reject hui ya permission nahi (${r.code}).")
                         r.code == 404 -> { last = GenError("Model '$mdl' nahi mila"); switchModel = true }
-                        r.code == 429 -> { last = GenError("API limit/quota (429) model $mdl"); switchModel = true }
+                        r.code == 429 -> { last = GenError("429"); quotaMsg = ProEngine.quotaWhy(txt, mdl); switchModel = true; if (ProEngine.fallbackModel(c, tried + mdl, false) == null) throw GenError(quotaMsg!!) }
                         r.code >= 500 -> { last = GenError("Gemini server error ${r.code} (model $mdl busy)"); switchModel = attempt >= 2; Log.w(TAG, "server ${r.code} on $mdl, retry $attempt") }
                         !r.isSuccessful -> throw GenError("API error ${r.code}: ${txt.take(150)}")
                         else -> {
@@ -65,7 +66,7 @@ object CodeGen {
             if (attempt < 6) try { Thread.sleep(1500L * attempt) } catch (_: InterruptedException) { break }
         }
         val l = last?.message ?: ""
-        throw GenError(if (l.contains("429")) "API limit/quota khatam. Thodi der baad try karo."
+        throw GenError(if (quotaMsg != null) "$quotaMsg Pakka hal: Google AI Studio me billing on karo."
             else "Google ke servers abhi busy hain (${tried.joinToString()} try kiye): $l. 1-2 minute baad dobara bolo.")
     }
 

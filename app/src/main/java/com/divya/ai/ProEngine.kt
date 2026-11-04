@@ -82,7 +82,7 @@ object ProEngine {
     /** Model busy (503/429) ho to agla model (jo abhi try nahi hua). */
     fun fallbackModel(c: Context, tried: Set<String>, pro: Boolean): String? {
         val l = (prefs(c).getString(if (pro) "autoProList" else "autoFastList", "") ?: "").split(",").filter { it.isNotBlank() }
-        val extra = if (pro) listOf("gemini-pro-latest", "gemini-flash-latest") else listOf("gemini-flash-latest")
+        val extra = if (pro) listOf("gemini-pro-latest", "gemini-flash-latest", "gemini-flash-lite-latest") else listOf("gemini-flash-latest", "gemini-flash-lite-latest")
         return (l + extra).firstOrNull { it !in tried }
     }
 
@@ -137,12 +137,38 @@ object ProEngine {
         "For very big projects tell the user they can tap the 📦 Project button to get a full ZIP generated in parallel. " +
         "Add short run instructions (Termux / Android Studio / PC) after code. Never claim you ran code that you did not run. Keep non-coding answers concise and friendly."
 
+    /** Google ke 429 jawab se asli karan nikalo: per-minute / roz ka limit / model ka free tier hi nahi (limit 0). */
+    fun quotaWhy(txt: String, model: String): String {
+        var msg = ""; var id = ""; var delay = ""
+        try {
+            val e = JSONObject(txt).optJSONObject("error")
+            msg = e?.optString("message").orEmpty()
+            val d = e?.optJSONArray("details")
+            if (d != null) for (i in 0 until d.length()) {
+                val o = d.optJSONObject(i) ?: continue
+                val t = o.optString("@type")
+                if (t.endsWith("QuotaFailure")) id += " " + (o.optJSONArray("violations")?.optJSONObject(0)?.optString("quotaId").orEmpty())
+                if (t.endsWith("RetryInfo")) delay = o.optString("retryDelay")
+            }
+        } catch (_: Exception) { msg = txt }
+        val whole = "$id $msg"
+        val head = when {
+            Regex("limit:\\s*0").containsMatchIn(whole) -> "Model '$model' ka free tier is key par hai hi nahi (limit 0). Doosra model chuno (⚙) ya billing on karo."
+            whole.contains("PerDay", true) || whole.contains("per day", true) -> "Model '$model' ka AAJ ka (roz ka) free limit khatam ho gaya. Kal tak ruko ya billing on karo."
+            whole.contains("PerMinute", true) || whole.contains("per minute", true) -> "Model '$model' ka per-minute limit lag gaya" + (if (delay.isNotBlank()) " - $delay ruk kar bhejo." else " - 1 minute ruk kar bhejo.")
+            else -> "Google ne limit laga di (429) model '$model' par."
+        }
+        return head + " [Google: " + msg.replace(Regex("\\s+"), " ").take(140) + "]"
+    }
+    /** Roz ka limit / limit 0: dobara try karna bekaar hai. */
+    fun hardQuota(txt: String): Boolean = Regex("limit:\\s*0").containsMatchIn(txt) || txt.contains("PerDay", true) || txt.contains("per day", true)
+
     private fun err(code: Int, txt: String, model: String, tried: Collection<String> = emptyList()): ApiError = ApiError(when {
         code == 400 && txt.contains("API key", true) -> "API key galat hai (Settings mein check karo)."
         code == 401 || code == 403 -> "API key reject hui ya permission nahi ($code)."
         code == 404 -> "Model '$model' nahi mila. Pro Chat ⚙ mein model ID khali chhod do (auto chunega)."
         code == 503 || code == 500 -> "Google ke models abhi busy hain (high demand). Try kiye: ${(tried + model).distinct().joinToString()}. ⚙ > '🔍 Models test' se dekho kaun sa chal raha hai, ya 1-2 minute baad dobara bhejo."
-        code == 429 -> "Google ki free API limit khatam (free key: ~10 requests/min aur roz ka limit). 1-2 minute ruk kar bhejo. Limit hataane ka ek hi pakka tarika: Google AI Studio me billing (pay-as-you-go) on karo - tab limit bahut badh jaati hai. Project mode ki parallel files (⚙) kam rakhna bhi madad karta hai."
+        code == 429 -> quotaWhy(txt, model) + " (Try kiye: ${(tried + model).distinct().joinToString()}). Pakka hal: Google AI Studio me billing on karo."
         else -> "API error $code: ${(try { JSONObject(txt).optJSONObject("error")?.optString("message").orEmpty() } catch (_: Exception) { "" }).ifBlank { txt }.take(160)}"
     })
 
@@ -300,7 +326,7 @@ object ProEngine {
                             if (ev.code == 429 || ev.code >= 500) { try { Thread.sleep(700) } catch (_: InterruptedException) {} }
                             launch(nxt)
                         } else if (running <= 0) {
-                            if (!retriedAll && (ev.code == 429 || ev.code >= 500 || ev.code == -1)) {   // sab busy: poori list ek baar dobara
+                            if (!retriedAll && ((ev.code == 429 && !hardQuota(ev.txt)) || ev.code >= 500 || ev.code == -1)) {   // sab busy: poori list ek baar dobara
                                 retriedAll = true
                                 try { Thread.sleep(2000) } catch (_: InterruptedException) {}
                                 tried.clear(); launch(primary)
