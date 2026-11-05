@@ -67,7 +67,7 @@ object Termux {
     private const val HOME = "/data/data/com.termux/files/home"
     private const val BASH = "/data/data/com.termux/files/usr/bin/bash"
     val log = mutableStateListOf<String>()
-    private val main = Handler(Looper.getMainLooper())
+    private val main by lazy { Handler(Looper.getMainLooper()) }
 
     fun installed(c: Context) = try { c.packageManager.getPackageInfo(PKG, 0); true } catch (_: Exception) { false }
     fun hasPerm(c: Context) = c.checkSelfPermission(PERM) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -75,17 +75,26 @@ object Termux {
 
     private fun note(s: String) { main.post { log.add(0, s.take(400)); while (log.size > 40) log.removeAt(log.lastIndex) } }
 
-    private val dangerRm = Regex("\\brm\\b[^;&|]*\\s-[a-z]*r[a-z]*\\b[^;&|]*\\s(/|~/?|\\\$home/?|\\\$\\{home}/?|\\*|/sdcard/?|/storage/?|/data/?|/storage/emulated/?(0/?)?)(\\s|\$|;|&|\\|)")
+    // Regex ko lazy + try/catch mein rakha hai: Android (ICU) ke regex engine mein agar koi pattern na chale
+    // to poora Termux object crash (NoClassDefFoundError) na ho. Braces '}' ab escape kiye hain.
+    private fun safeRegex(p: String): Regex? = try { Regex(p) } catch (_: Throwable) { null }
+    private val dangerRm: Regex? by lazy {
+        safeRegex("\\brm\\b[^;&|]*\\s-[a-z]*r[a-z]*\\b[^;&|]*\\s(/|~/?|\\\$home/?|\\\$\\{home\\}/?|\\*|/sdcard/?|/storage/?|/data/?|/storage/emulated/?(0/?)?)(\\s|\$|;|&|\\|)")
+    }
     private val blockedWords = listOf("mkfs", "dd if=", ":(){", "> /dev/sd", "> /dev/block", "chmod -r 777 /", "chown -r", "su -c", "reboot", "shutdown", "poweroff",
         "termux-sms", "termux-telephony", "termux-contact", "termux-call-log", "termux-clipboard-get", "termux-camera", "termux-microphone", "termux-location", "termux-wifi")
-    private val pipeShell = Regex("(curl|wget)[^|;]*\\|\\s*(sudo\\s+)?(ba|z)?sh\\b")
+    private val pipeShell: Regex? by lazy { safeRegex("(curl|wget)[^|;]*\\|\\s*(sudo\\s+)?(ba|z)?sh\\b") }
 
     /** null = theek hai, warna block karne ka karan. */
     fun danger(cmd: String): String? {
         val t = cmd.lowercase().replace(Regex("\\s+"), " ")
-        if (dangerRm.containsMatchIn(t)) return "poora home/storage delete karne wala rm"
+        val rm = dangerRm
+        if (rm != null) { if (rm.containsMatchIn(t)) return "poora home/storage delete karne wala rm" }
+        else if (t.contains("rm ") && Regex("\\s-[a-z]*r").containsMatchIn(t) && listOf(" /", " ~", "\$home", " *").any { t.contains(it) }) return "rm -r (safety)"
         blockedWords.firstOrNull { t.contains(it) }?.let { return "'$it'" }
-        if (pipeShell.containsMatchIn(t)) return "internet se script download karke seedha chalana (curl|sh)"
+        val ps = pipeShell
+        val piped = if (ps != null) ps.containsMatchIn(t) else ((t.contains("curl") || t.contains("wget")) && (t.contains("| sh") || t.contains("|sh") || t.contains("| bash") || t.contains("|bash")))
+        if (piped) return "internet se script download karke seedha chalana (curl|sh)"
         return null
     }
 
@@ -173,7 +182,7 @@ object Termux {
     } catch (e: Exception) { return "failed: ${e.message}" }
     }
 
-    private val tunnelUrl = Regex("https://[a-z0-9-]+\\.trycloudflare\\.com")
+    private val tunnelUrl by lazy { Regex("https://[a-z0-9-]+\\.trycloudflare\\.com") }
 
     /** Netlify token ke bina: project Termux mein copy -> python http.server -> cloudflared quick tunnel -> public link (jab tak Termux chal raha hai). */
     fun publishTunnel(c: Context, project: String): String {
@@ -230,8 +239,8 @@ fun TermuxScreen(th: UiTheme, prefs: SharedPreferences) {
     var busy by remember { mutableStateOf(false) }
     var out by remember { mutableStateOf("") }
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
-    val inst = remember(tick) { Termux.installed(ctx) }
-    val perm = remember(tick) { Termux.hasPerm(ctx) }
+    val inst = remember(tick) { try { Termux.installed(ctx) } catch (_: Throwable) { false } }
+    val perm = remember(tick) { try { Termux.hasPerm(ctx) } catch (_: Throwable) { false } }
     fun runBg(c: String, visible: Boolean) {
         if (busy) return
         busy = true; out = "chal raha hai…"

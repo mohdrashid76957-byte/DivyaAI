@@ -541,6 +541,8 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     var voice by remember { mutableStateOf(prefs.getString("voice", "Aoede")!!) }
     var callName by remember { mutableStateOf(prefs.getString("call", "Sir")!!) }
     var nlToken by remember { mutableStateOf(prefs.getString("netlifyToken", "") ?: "") }
+    val homeOrig = remember { prefs.getString("homeAddr", "") ?: "" }
+    var homeAddr by remember { mutableStateOf(homeOrig) }
     var saved by remember { mutableStateOf(false) }
     val colors = OutlinedTextFieldDefaults.colors(focusedTextColor = th.text, unfocusedTextColor = th.text)
     Text("Gemini API Key", color = th.accent, fontWeight = FontWeight.Bold)
@@ -549,11 +551,14 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     OutlinedTextField(model, { model = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Live voice model ID (sabse tez: gemini-3.8-live)") }, colors = colors)
     OutlinedTextField(voice, { voice = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Female voice (Aoede / Kore / Leda / Zephyr)") }, colors = colors)
     OutlinedTextField(callName, { callName = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Divya tumhe kya bulaye (Sir / Boss / naam)") }, colors = colors)
+    OutlinedTextField(homeAddr, { homeAddr = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Ghar ka address (Divya rasta dikhane ke liye)") }, colors = colors)
+    Text("Ya Divya se bolo: \"yahi mera ghar hai, save kar lo\" - tab sabse sahi nishaan (GPS) save hota hai.", color = th.text, fontSize = 12.sp)
     Text("Website publish (Maya jaisa, seconds mein live link)", color = th.accent, fontWeight = FontWeight.Bold)
     Text("app.netlify.com par free account > User settings > Applications > Personal access token banao aur yahan daalo. Phir bolo: \"Divya, mere liye portfolio website banao aur live karo\".", color = th.text, fontSize = 12.sp)
     OutlinedTextField(nlToken, { nlToken = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Netlify token") },
         visualTransformation = PasswordVisualTransformation(), singleLine = true, colors = colors)
-    Btn(th, "Save") { prefs.edit().putString("netlifyToken", nlToken.trim()).putString("key", key.trim()).putString("model", model.trim()).putString("voice", voice.trim()).putString("call", callName.trim().ifBlank { "Sir" }).apply(); saved = true }
+    Btn(th, "Save") { prefs.edit().putString("netlifyToken", nlToken.trim()).putString("key", key.trim()).putString("model", model.trim()).putString("voice", voice.trim()).putString("call", callName.trim().ifBlank { "Sir" })
+        .also { e -> e.putString("homeAddr", homeAddr.trim()); if (homeAddr.trim() != homeOrig) { e.remove("homeLat"); e.remove("homeLng") } }.apply(); saved = true }
     if (saved) Text("✅ Saved", color = th.accent)
     Btn(th, "Backup & restore (yaadein, chats)") { openBackup() }
     Btn(th, "🎙 Voice Settings (30 awaazein, pitch, speed, accent)") { openExtra(Screen.VoiceSettings) }
@@ -679,6 +684,7 @@ fun PermsScreen(th: UiTheme, ctx: Context) {
     val conL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
     val notiL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
     val callL = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { tick++ }
+    val locL = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { tick++ }
     fun go(i: Intent) = ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     key(tick) {
         val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -692,6 +698,8 @@ fun PermsScreen(th: UiTheme, ctx: Context) {
                 ctx.checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED &&
                 ctx.checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) == PackageManager.PERMISSION_GRANTED) {
                 callL.launch(arrayOf(Manifest.permission.CALL_PHONE, Manifest.permission.ANSWER_PHONE_CALLS)) },
+            Triple("Location (Google Maps rasta, 'main kahan hoon', mausam)", PhoneTools.hasLoc(ctx)) {
+                locL.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },
             Triple("Notification access (Divya aapki notifications padh sake)", DivyaNotifListener.instance != null) { go(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
             Triple("Notifications", Build.VERSION.SDK_INT < 33 || ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
                 if (Build.VERSION.SDK_INT >= 33) notiL.launch(Manifest.permission.POST_NOTIFICATIONS) },

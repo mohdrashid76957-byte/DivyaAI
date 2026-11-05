@@ -274,3 +274,27 @@ Chat screen (Home > Chat with AI) ab nayi **Pro Chat** hai. Ye Live voice model 
 - Naya **Ice Light** theme (light blue/white background) + naya full-height Divya model (`res/drawable/divya_ice.png`, reference photo se cutout).
 - Layout: upar Divya AI orb + speech bubble + Tap to Talk, beech mein model, left/right glass tiles, neeche blue nav bar. Code: `IceHome.kt`.
 - Fresh install par ye default hai. Pehle se app chal rahi ho to Settings > UI Design > "Ice Light" chuno.
+
+## v2.21.1 - Termux screen crash fix
+- **Bug:** Settings se Termux mode ON / Termux screen kholte hi app crash (`NoClassDefFoundError: com.divya.ai.Termux`). Karan: `Termux` object ke andar regex (`\\{home}` mein unescaped `}`) Android ke regex engine (ICU) mein compile nahi hota tha -> object init fail -> pura class unusable.
+- **Fix:** braces escape kiye, regex `lazy` + try/catch mein (fail ho to simple string-check se safety block chalta hai), Handler bhi lazy. TermuxScreen ke installed/permission checks crash-proof.
+- CrashLog mein dikhne wala version ab asli version batata hai (pehle 2.16.4 atka tha).
+
+## v2.22.0 - Live web search, mausam, Google Maps, Play Store install
+Pehle Divya bolti thi "main search/weather/news/Play Store nahi kar sakti" aur do_steps mein Play Store/Google app ka tap/type fail hota tha. Ab:
+- **web_search**: Google Search wala Gemini jawab (badi khabrein, score, price, kuch bhi taaza). Settings mein Gemini API key chahiye. **open_google_search**: nateeje screen par dikhata hai.
+- **get_weather**: Open-Meteo (free, key nahi). Shehar na bolo to abhi ki location ka mausam; aaj + kal ka forecast.
+- **Location / Maps** (Permissions > Location Allow karo):
+  - `where_am_i`: GPS se abhi ka pata + Maps link (show_map=true to Maps mein nishaan).
+  - `navigate_to(destination, mode)`: Google Maps khulta hai aur current location se rasta/navigation shuru. Koi bhi address ya jagah bol sakte ho.
+  - `navigate_home` + `save_home`: Settings mein "Ghar ka address" daalo, ya Divya se bolo "yahi mera ghar hai" (GPS nishaan save).
+  - `maps_search`: paas ka hospital / police / ATM / petrol pump.
+  - Kho jaane par: Divya shaanti se pata batati hai, poochti hai kahan jaana hai, Maps mein rasta dikhati hai; chaaho to family ko WhatsApp par location link bhej sakti hai.
+  - LiveKeepService ab location type ke saath bhi chalti hai (background mein GPS ke liye).
+- **install_app(app_name)**: Play Store search page se package nikalti hai, Play Store ka app page kholti hai, "Install" dabati hai, download poora hone tak dekhti hai aur khatam hone par batati hai.
+- **Tap/type fix** (do_steps, tap_text, type_text): text + description + hint se dhundta hai, saari app windows dekhta hai, input box na mile to "Search" dabakar dhundta hai, set-text fail ho to paste. Naya `tapAnyExact`.
+- Naye files/badlav: `PhoneTools.kt` (naya), DivyaService, GeminiLive (tools + prompt), LiveKeepService, Manifest (location permissions, Maps/Play queries), Settings/Permissions UI.
+- Dhyan: Android Studio mein build karke abhi test nahi hua.
+
+## v2.22.1
+- Sirf version badla: About screen aur crash dialog ab asli version (2.22.1) dikhate hain, taaki pata chale kaun si APK install hai. Agar crash dialog mein "v2.16.4" ya "Termux.kt:233" dikhe to purani APK chal rahi hai - nayi build install nahi hui.

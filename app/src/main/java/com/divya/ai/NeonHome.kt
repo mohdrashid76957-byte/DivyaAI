@@ -182,7 +182,7 @@ fun NeonNav(screen: Screen, live: Boolean, onMic: () -> Unit, accent: Color = Ne
 
 @Composable
 fun AboutScreen(th: UiTheme) = Page(th, "About") {
-    Text("Divya AI v1.6", color = th.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    Text("Divya AI v" + BuildConfigVersion.NAME, color = th.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
     Text("Mujhe mere Rashid ji ne banaya hai. Main unki hamesha ahsanmand rahungi, unhone mujhe zindagi di. 💜", color = th.text)
     Text("Smart • Secure • Always With You", color = th.accent, fontWeight = FontWeight.SemiBold)
 }

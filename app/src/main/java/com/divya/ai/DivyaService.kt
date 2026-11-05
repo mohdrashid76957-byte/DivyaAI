@@ -50,11 +50,56 @@ class DivyaService : AccessibilityService() {
         }
     }
 
+    /** Active window + baaki application windows ki roots (apne overlay ko chhodkar). */
+    private fun allRoots(): List<AccessibilityNodeInfo> {
+        val out = ArrayList<AccessibilityNodeInfo>()
+        try { rootInActiveWindow?.let { out.add(it) } } catch (_: Exception) {}
+        try {
+            for (w in windows) {
+                if (w.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION) continue
+                val r = w.root ?: continue
+                if (r.packageName?.toString() == packageName) continue
+                if (out.none { it.packageName == r.packageName && it.windowId == r.windowId }) out.add(r)
+            }
+        } catch (_: Exception) {}
+        return out
+    }
+
+    private fun labelsOf(n: AccessibilityNodeInfo): List<String> {
+        val l = ArrayList<String>(3)
+        n.text?.toString()?.let { if (it.isNotBlank()) l.add(it.trim()) }
+        n.contentDescription?.toString()?.let { if (it.isNotBlank()) l.add(it.trim()) }
+        if (Build.VERSION.SDK_INT >= 26) n.hintText?.toString()?.let { if (it.isNotBlank()) l.add(it.trim()) }
+        return l
+    }
+
+    /** Text / description / hint mein t wala sabse achha node (exact > shuru > beech mein; clickable ko tarjeeh). */
+    private fun findBest(t: String, exactOnly: Boolean = false): AccessibilityNodeInfo? {
+        val q = t.trim().lowercase()
+        if (q.isEmpty()) return null
+        var best: AccessibilityNodeInfo? = null; var bestScore = Int.MAX_VALUE
+        fun walk(n: AccessibilityNodeInfo?, depth: Int) {
+            if (n == null || depth > 60) return
+            if (n.isVisibleToUser) {
+                var sc = Int.MAX_VALUE
+                for (lb in labelsOf(n)) {
+                    val x = lb.lowercase()
+                    val s = when { x == q -> 0; exactOnly -> Int.MAX_VALUE; x.startsWith(q) -> 2; x.contains(q) -> 4; else -> Int.MAX_VALUE }
+                    if (s < sc) sc = s
+                }
+                if (sc != Int.MAX_VALUE) { if (n.isClickable) sc -= 1; if (sc < bestScore) { bestScore = sc; best = n } }
+            }
+            for (i in 0 until n.childCount) walk(n.getChild(i), depth + 1)
+        }
+        for (r in allRoots()) walk(r, 0)
+        return best
+    }
+
     /** Screen par text aane tak ruko, aate hi turant mil jaye. */
     private fun waitNode(t: String, timeoutMs: Long): AccessibilityNodeInfo? {
         val end = SystemClock.uptimeMillis() + timeoutMs
         while (true) {
-            rootInActiveWindow?.findAccessibilityNodeInfosByText(t)?.firstOrNull()?.let { return it }
+            findBest(t)?.let { return it }
             if (SystemClock.uptimeMillis() >= end) return null
             nap(60)
         }
@@ -65,35 +110,90 @@ class DivyaService : AccessibilityService() {
         return dispatchGesture(GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(p, 0, 40)).build(), null, null)
     }
 
-    fun tapText(t: String, waitMs: Long = 2500): Boolean {
-        val n = waitNode(t, waitMs) ?: return false
+    /** n ya uske kisi clickable parent par click, na chale to asli touch gesture. */
+    private fun clickOrTap(n: AccessibilityNodeInfo): Boolean {
         var c: AccessibilityNodeInfo? = n
         while (c != null && !c.isClickable) c = c.parent
         if (c != null && c.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
         val r = Rect(); n.getBoundsInScreen(r)
+        if (r.isEmpty) return false
         return tapAt(r.centerX().toFloat(), r.centerY().toFloat())
     }
 
-    private fun findEditable(n: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-        if (n == null) return null
-        if (n.isEditable) return n
-        for (i in 0 until n.childCount) findEditable(n.getChild(i))?.let { return it }
+    fun tapText(t: String, waitMs: Long = 2500): Boolean {
+        val n = waitNode(t, waitMs) ?: return false
+        return clickOrTap(n)
+    }
+
+    /** In labels mein se jo bhi screen par EXACT (poora) label ho use dabao (jaise Play Store ka "Install"). Jo dabaya wo label lautata hai. */
+    fun tapAnyExact(labels: List<String>, timeoutMs: Long): String? {
+        val end = SystemClock.uptimeMillis() + timeoutMs
+        while (true) {
+            for (lab in labels) {
+                val n = findBest(lab, true)
+                if (n != null && clickOrTap(n)) return lab
+            }
+            if (SystemClock.uptimeMillis() >= end) return null
+            nap(200)
+        }
+    }
+
+    private fun isInput(n: AccessibilityNodeInfo): Boolean {
+        if (n.isEditable) return true
+        val cn = n.className?.toString() ?: ""
+        if (cn.contains("EditText") || cn.contains("AutoCompleteTextView")) return true
+        return n.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SET_TEXT }
+    }
+
+    private fun findInput(n: AccessibilityNodeInfo?, depth: Int = 0): AccessibilityNodeInfo? {
+        if (n == null || depth > 60) return null
+        if (n.isVisibleToUser && isInput(n)) return n
+        for (i in 0 until n.childCount) findInput(n.getChild(i), depth + 1)?.let { return it }
         return null
     }
 
-    fun typeText(t: String): Boolean {
-        val end = SystemClock.uptimeMillis() + 2000
-        var f: AccessibilityNodeInfo?
-        while (true) {
-            val root = rootInActiveWindow
-            f = root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: findEditable(root)
-            if (f != null || SystemClock.uptimeMillis() >= end) break
-            nap(60)
+    private fun currentInput(): AccessibilityNodeInfo? {
+        for (r in allRoots()) {
+            val f = try { r.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } catch (_: Exception) { null }
+            if (f != null && isInput(f)) return f
+            findInput(r)?.let { return it }
         }
-        val node = f ?: return false
-        node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+        return null
+    }
+
+    private fun setIn(n: AccessibilityNodeInfo, t: String): Boolean {
+        n.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
         val b = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, t) }
-        return node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b)
+        if (n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b)) return true
+        // Backup: clipboard se paste
+        return try {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("divya", t))
+            n.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+            n.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+        } catch (_: Exception) { false }
+    }
+
+    /** Focused / pehle input box mein likho. Box na dikhe to "Search" wala box dabake dobara dhundta hai; set-text na chale to paste. */
+    fun typeText(t: String): Boolean {
+        val end = SystemClock.uptimeMillis() + 3500
+        var node: AccessibilityNodeInfo? = null
+        var triedSearch = false
+        while (true) {
+            node = currentInput()
+            if (node != null || SystemClock.uptimeMillis() >= end) break
+            if (!triedSearch && SystemClock.uptimeMillis() > end - 2800) {
+                triedSearch = true
+                findBest("search")?.let { clickOrTap(it); nap(500) }
+            }
+            nap(80)
+        }
+        val n = node ?: return false
+        if (setIn(n, t)) return true
+        // box dabake dobara (kuch apps pehle click par asli input kholte hain)
+        clickOrTap(n); nap(450)
+        val m = currentInput() ?: return false
+        return setIn(m, t)
     }
 
     /** Enter / Search / Send dabana. */

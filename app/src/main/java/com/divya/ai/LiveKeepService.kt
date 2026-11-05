@@ -25,8 +25,14 @@ class LiveKeepService : Service() {
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)).build()
         try {
-            if (Build.VERSION.SDK_INT >= 29) startForeground(78, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-            else startForeground(78, n)
+            if (Build.VERSION.SDK_INT >= 29) {
+                val mic = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                // Location type bhi (agar permission mili hai) taaki background mein bhi "main kahan hoon" / Maps ke liye GPS mil sake
+                try {
+                    if (PhoneTools.hasLoc(this)) startForeground(78, n, mic or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+                    else startForeground(78, n, mic)
+                } catch (e: Exception) { startForeground(78, n, mic) }
+            } else startForeground(78, n)
         } catch (e: Exception) { stopSelf(); return START_NOT_STICKY }
         return START_NOT_STICKY
     }
