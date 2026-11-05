@@ -212,7 +212,7 @@ class GeminiLive(
     private fun setup(model: String, voice: String) = JSONObject().put("setup", JSONObject()
         .put("model", "models/$model")
         .put("generationConfig", genCfg(voice))
-        .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", if (gfMode) prompt() + " " + gfPrompt() else prompt()))))
+        .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", (if (gfMode) prompt() + " " + gfPrompt() else prompt()) + " " + VoiceExtras.hint(ctx.getSharedPreferences("divya", 0))))))
         .put("realtimeInputConfig", JSONObject().put("automaticActivityDetection", JSONObject()
             .put("startOfSpeechSensitivity", "START_SENSITIVITY_HIGH").put("endOfSpeechSensitivity", "END_SENSITIVITY_HIGH")
             .put("prefixPaddingMs", 20).put("silenceDurationMs", 350)))

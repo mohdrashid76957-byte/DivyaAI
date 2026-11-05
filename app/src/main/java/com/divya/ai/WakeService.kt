@@ -78,7 +78,8 @@ class WakeService : Service() {
         listen()
     }
 
-    private fun matches(t: String): Boolean = SessionControl.isWake(t) || keys.any { t.lowercase().contains(it) }
+    private fun matches(t: String): Boolean = SessionControl.isWake(t) || keys.any { t.lowercase().contains(it) } ||
+        WakeWords.matches(getSharedPreferences("divya", 0), t)
 
     /** Recognizer band karo aur purane callbacks ko invalid karo. */
     private fun releaseMic() {

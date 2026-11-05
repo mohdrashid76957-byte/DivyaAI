@@ -59,11 +59,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
-enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, Journal, Study, Scan, About, Code, Preview, Guardian, Backup, ProChat }
+enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, Journal, Study, Scan, About, Code, Preview, Guardian, Backup, ProChat, VoiceSettings, ManageApi, WakeWords }
 
 class UiTheme(
     val name: String, val img: Int, val circle: Boolean, val bg: Brush, val text: Color, val accent: Color,
-    val greet: String, val menu: List<Triple<String, Screen, ImageVector>>, val hud: Boolean = false, val maya: Boolean = false, val neon: Boolean = false, val ice: Boolean = false
+    val greet: String, val menu: List<Triple<String, Screen, ImageVector>>, val hud: Boolean = false, val maya: Boolean = false, val neon: Boolean = false, val ice: Boolean = false, val cyber: Boolean = false
 )
 
 val themes = listOf(
@@ -137,7 +137,11 @@ val themes = listOf(
     // Ice Light: halka (light) neon-glass theme, poori-height Divya model + dono taraf glass tiles (reference photo se)
     UiTheme("Ice Light", R.drawable.divya_ice, false,
         Brush.verticalGradient(listOf(Color(0xFFCFE4FF), Color(0xFFE6F1FF), Color(0xFFF6FAFF))), Color(0xFF0B1B3F), Color(0xFF1E90FF),
-        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), ice = true)
+        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), ice = true),
+    // Cyber HUD: dark navy + cyan neon, Core Systems gauges + Control Center (reference photo se)
+    UiTheme("Cyber HUD", R.drawable.divya_ice, false,
+        Brush.verticalGradient(listOf(Color(0xFF020B14), Color(0xFF041B2B), Color(0xFF020B14))), Color.White, Color(0xFF19E3F0),
+        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), cyber = true)
 )
 
 class MainActivity : ComponentActivity() {
@@ -244,6 +248,9 @@ fun DivyaApp(ctx: Context) {
         msgs.add("You" to t)
         val offlineNow = !Net.online(ctx) || prefs.getBoolean("offlineOnly", false)
         if (live.running) live.sendText(t)
+        else if (!offlineNow && LlmRouter.ready(prefs)) {
+            LlmRouter.ask(prefs, msgs.toList(), prefs.getString("call", "Sir") ?: "Sir") { r -> msgs.add("Divya" to r) }
+        }
         else if (offlineNow || key().isBlank()) {
             // Internet/API key nahi: Offline smart brain typed sawaal ka jawab deti hai
             off.askText(t) { r -> msgs.add("Divya" to r) }
@@ -299,7 +306,8 @@ fun DivyaApp(ctx: Context) {
                 },
                 label = "screen"
             ) { s -> when (s) {
-                Screen.Home -> if (th.ice) IceHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
+                Screen.Home -> if (th.cyber) CyberHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
+                    else if (th.ice) IceHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
                     else if (th.neon) NeonHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic, {
                     // Avatar par tap: agla avatar design (Neon, 3D, Anime, Blue, Gold, Pink)
                     val n = themes.indices.filter { themes[it].neon }
@@ -321,9 +329,12 @@ fun DivyaApp(ctx: Context) {
                 Screen.Automate -> AutomateScreen(th)
                 Screen.Phone -> PhoneScreen(th, ctx) { screen = Screen.Perms }
                 Screen.Guardian -> GuardianScreen(th, prefs, ctx)
-                Screen.Settings -> SettingsScreen(th, prefs, themeIdx, { themeIdx = it; prefs.edit().putInt("theme2", it).apply() }, { screen = Screen.Guardian }, { screen = Screen.Backup }) { screen = Screen.Perms }
+                Screen.Settings -> SettingsScreen(th, prefs, themeIdx, { themeIdx = it; prefs.edit().putInt("theme2", it).apply() }, { screen = Screen.Guardian }, { screen = Screen.Backup }, { screen = it }) { screen = Screen.Perms }
                 Screen.Perms -> PermsScreen(th, ctx)
                 Screen.About -> AboutScreen(th)
+                Screen.VoiceSettings -> VoiceSettingsScreen(th, prefs)
+                Screen.ManageApi -> ManageApiScreen(th, prefs)
+                Screen.WakeWords -> WakeWordsScreen(th, prefs)
                 Screen.Backup -> BackupScreen(th, ctx)
             } }
         }
@@ -522,7 +533,7 @@ fun PhoneScreen(th: UiTheme, ctx: Context, openPerms: () -> Unit) = Page(th, "Ph
 }
 
 @Composable
-fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeIdx: Int, setTheme: (Int) -> Unit, openGuardian: () -> Unit, openBackup: () -> Unit, openPerms: () -> Unit) = Page(th, "Settings") {
+fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeIdx: Int, setTheme: (Int) -> Unit, openGuardian: () -> Unit, openBackup: () -> Unit, openExtra: (Screen) -> Unit, openPerms: () -> Unit) = Page(th, "Settings") {
     var key by remember { mutableStateOf(prefs.getString("key", "") ?: "") }
     var model by remember { mutableStateOf(prefs.getString("model", "gemini-3.8-live")!!) }
     var voice by remember { mutableStateOf(prefs.getString("voice", "Aoede")!!) }
@@ -543,6 +554,9 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     Btn(th, "Save") { prefs.edit().putString("netlifyToken", nlToken.trim()).putString("key", key.trim()).putString("model", model.trim()).putString("voice", voice.trim()).putString("call", callName.trim().ifBlank { "Sir" }).apply(); saved = true }
     if (saved) Text("✅ Saved", color = th.accent)
     Btn(th, "Backup & restore (yaadein, chats)") { openBackup() }
+    Btn(th, "🎙 Voice Settings (30 awaazein, pitch, speed, accent)") { openExtra(Screen.VoiceSettings) }
+    Btn(th, "🔑 Manage API (Gemini, Claude, Grok, Groq…)") { openExtra(Screen.ManageApi) }
+    Btn(th, "👂 Wake Words (apne wake word jodo)") { openExtra(Screen.WakeWords) }
     AnnounceSettings(th, prefs)
     Text("UI Design / Avatar (3D, Anime, Blue, Gold, Pink, Neon…)", color = th.accent, fontWeight = FontWeight.Bold)
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

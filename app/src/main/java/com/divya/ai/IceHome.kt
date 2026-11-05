@@ -85,7 +85,7 @@ fun IceHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic:
         IceTileData(Icons.Filled.QrCodeScanner, "Scanner", blue, true) { go(Screen.Scan) },
         IceTileData(Icons.Filled.PhoneAndroid, "Control Mobile", blue, false) { go(Screen.Phone) },
         IceTileData(Icons.Filled.SmartToy, "AI Tools", blue, false) { go(Screen.Automate) },
-        IceTileData(Icons.Filled.GraphicEq, "Voice Changer", blue, false) { go(Screen.Settings) },
+        IceTileData(Icons.Filled.GraphicEq, "Voice Changer", blue, false) { go(Screen.VoiceSettings) },
         IceTileData(Icons.Filled.FlashOn, "Quick Actions", Color(0xFFFFC107), false) { go(Screen.Quick) }
     )
 
