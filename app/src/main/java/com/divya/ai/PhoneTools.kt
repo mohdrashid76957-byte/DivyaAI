@@ -51,17 +51,82 @@ object PhoneTools {
 
     // ============================== WEB SEARCH ==============================
 
-    /** Google Search se jude (grounded) Gemini jawab: news, mausam, score, kisi bhi taaza sawaal ke liye. Background thread par chalao. */
+    @Volatile private var geminiSearchFailAt = 0L
+
+    private fun plain(h: String): String = try {
+        (if (Build.VERSION.SDK_INT >= 24) android.text.Html.fromHtml(h, android.text.Html.FROM_HTML_MODE_LEGACY) else android.text.Html.fromHtml(h)).toString().replace(Regex("\\s+"), " ").trim()
+    } catch (_: Throwable) { h.replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim() }
+
+    private val UA_WEB = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
+
+    private fun looksNews(q: String): Boolean {
+        val t = q.lowercase()
+        return listOf("news", "khabar", "khabre", "khabren", "headline", "samachar", "समाचार", "खबर").any { t.contains(it) }
+    }
+
+    /** Google News RSS: taaza headlines (key nahi chahiye). */
+    private fun newsRss(q: String): List<String> {
+        val generic = Regex("\\b(aaj|badi|bade|top|latest|taaza|breaking|india|desh|news|khabar|khabre|khabren|batao|bataiye|ki|ka|ke|kya|hai)\\b", RegexOption.IGNORE_CASE)
+        val topic = q.replace(generic, " ").replace(Regex("\\s+"), " ").trim()
+        val url = if (topic.length < 3) "https://news.google.com/rss?hl=hi&gl=IN&ceid=IN:hi"
+        else "https://news.google.com/rss/search?q=" + Uri.encode(topic) + "&hl=hi&gl=IN&ceid=IN:hi"
+        val x = httpGet(url, UA_WEB) ?: return emptyList()
+        return Regex("<item>(.*?)</item>", RegexOption.DOT_MATCHES_ALL).findAll(x).mapNotNull { m ->
+            Regex("<title>(.*?)</title>", RegexOption.DOT_MATCHES_ALL).find(m.groupValues[1])?.groupValues?.get(1)
+        }.map { plain(it.replace("<![CDATA[", "").replace("]]>", "")) }.filter { it.isNotBlank() }.take(7).toList()
+    }
+
+    private fun ddg(q: String): List<String> {
+        val h = httpGet("https://html.duckduckgo.com/html/?q=" + Uri.encode(q), UA_WEB) ?: return emptyList()
+        val titles = Regex("class=\"result__a\"[^>]*>(.*?)</a>", RegexOption.DOT_MATCHES_ALL).findAll(h).map { plain(it.groupValues[1]) }.toList()
+        val snips = Regex("class=\"result__snippet\"[^>]*>(.*?)</a>", RegexOption.DOT_MATCHES_ALL).findAll(h).map { plain(it.groupValues[1]) }.toList()
+        return titles.indices.take(6).map { i -> titles[i] + (if (i < snips.size) " - " + snips[i] else "") }
+    }
+
+    private fun bing(q: String): List<String> {
+        val h = httpGet("https://www.bing.com/search?setlang=en&cc=IN&q=" + Uri.encode(q), UA_WEB) ?: return emptyList()
+        return h.split("<li class=\"b_algo\"").drop(1).take(6).mapNotNull { ch ->
+            val t = Regex("<h2[^>]*><a[^>]*>(.*?)</a>", RegexOption.DOT_MATCHES_ALL).find(ch)?.groupValues?.get(1)?.let { plain(it) } ?: return@mapNotNull null
+            val sn = Regex("<p[^>]*>(.*?)</p>", RegexOption.DOT_MATCHES_ALL).find(ch)?.groupValues?.get(1)?.let { plain(it) } ?: ""
+            if (sn.isBlank()) t else "$t - $sn"
+        }
+    }
+
+    private fun wiki(q: String): List<String> {
+        val j = httpGet("https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=4&srsearch=" + Uri.encode(q)) ?: return emptyList()
+        return try {
+            val a = JSONObject(j).getJSONObject("query").getJSONArray("search")
+            (0 until a.length()).map { i -> a.getJSONObject(i).let { plain(it.optString("title") + " - " + it.optString("snippet")) } }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    /** Gemini ka limit (429) / error aaye to bina key ke seedha web se nateeje (news RSS, DuckDuckGo, Bing, Wikipedia). */
+    private fun fallbackSearch(q: String): String {
+        var lines: List<String> = emptyList()
+        if (looksNews(q)) lines = newsRss(q)
+        if (lines.isEmpty()) lines = ddg(q)
+        if (lines.isEmpty()) lines = bing(q)
+        if (lines.isEmpty()) lines = wiki(q)
+        if (lines.isEmpty()) return "failed: internet se koi nateeja nahi mila (net check karo)"
+        return "done: Ye seedha web se mile nateeje hain (Gemini ka limit khatam tha). Inhe padhkar user ko simple Hinglish mein 3-5 chhoti lines mein batao, link mat bolo:\n" +
+            lines.mapIndexed { i, l -> "${i + 1}) ${l.take(220)}" }.joinToString("\n")
+    }
+
+    /** Google Search se jude (grounded) Gemini jawab; limit/error par seedha web nateeje. Background thread par chalao. */
     fun webSearch(c: Context, query: String): String {
         if (query.isBlank()) return "failed: sawaal khali hai"
-        return try {
-            val today = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", Locale.ENGLISH).format(java.util.Date())
-            val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", query))))
-            val sys = "You are a fast live-web research helper for a voice assistant in India. Today is $today (IST). Use Google Search and answer with the LATEST facts in simple Hinglish, " +
-                "maximum 6 short lines, plain text only (no markdown, no URLs, no asterisks). For news give the top 4-5 headlines with one short line each. If you could not find it, say so."
-            val r = ProEngine.stream(c, sys, contents, 0, true, AtomicBoolean(false)) { }
-            if (r.isBlank()) "failed: web se koi jawab nahi mila" else "done: " + r.trim().take(1600)
-        } catch (e: Throwable) { "failed: web search nahi chali: ${e.message}" }
+        if (System.currentTimeMillis() - geminiSearchFailAt > 10 * 60_000L) {
+            try {
+                val today = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", Locale.ENGLISH).format(java.util.Date())
+                val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", query))))
+                val sys = "You are a fast live-web research helper for a voice assistant in India. Today is $today (IST). Use Google Search and answer with the LATEST facts in simple Hinglish, " +
+                    "maximum 6 short lines, plain text only (no markdown, no URLs, no asterisks). For news give the top 4-5 headlines with one short line each. If you could not find it, say so."
+                val r = ProEngine.stream(c, sys, contents, 0, true, AtomicBoolean(false)) { }
+                if (r.isNotBlank()) return "done: " + r.trim().take(1600)
+            } catch (_: Throwable) { }
+            geminiSearchFailAt = System.currentTimeMillis()   // 10 min tak Gemini search chhodke seedha web
+        }
+        return try { fallbackSearch(query) } catch (e: Throwable) { "failed: web search nahi chali: ${e.message}" }
     }
 
     /** Google search ke nateeje screen par dikhao (Google app / browser mein). */

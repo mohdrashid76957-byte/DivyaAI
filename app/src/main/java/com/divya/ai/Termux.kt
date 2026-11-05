@@ -134,6 +134,10 @@ object Termux {
         TermuxBus.latches.remove(id)
         val r = TermuxBus.results.remove(id)
         if (!ok || r == null) { note("⏳ result nahi aaya: ${cmd.take(60)}"); return "timeout: ${waitSec}s mein result nahi aaya (command abhi chal raha ho sakta hai, ya allow-external-apps=true set nahi hai)." }
+        if (r.errMsg.contains("allow-external-apps", true) || r.err.contains("allow-external-apps", true) || (r.errMsg.contains("RunCommandService", true) && r.code == -1)) {
+            note("⚠ Termux mein allow-external-apps=true set nahi hai")
+            return "failed: Termux ne command rok di kyunki usme allow-external-apps=true set nahi hai. User ko bolo: Termux kholke ye ek command chalaye:  echo 'allow-external-apps=true' >> ~/.termux/termux.properties  phir Termux ko poora band karke (recent apps se hata ke) dobara khole. Uske baad main command chala sakti hoon."
+        }
         val s = StringBuilder("exit=${r.code}")
         if (r.out.isNotBlank()) s.append("\nstdout:\n").append(r.out.trim().takeLast(1500))
         if (r.err.isNotBlank()) s.append("\nstderr:\n").append(r.err.trim().takeLast(800))

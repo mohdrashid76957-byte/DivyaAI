@@ -298,3 +298,8 @@ Pehle Divya bolti thi "main search/weather/news/Play Store nahi kar sakti" aur d
 
 ## v2.22.1
 - Sirf version badla: About screen aur crash dialog ab asli version (2.22.1) dikhate hain, taaki pata chale kaun si APK install hai. Agar crash dialog mein "v2.16.4" ya "Termux.kt:233" dikhe to purani APK chal rahi hai - nayi build install nahi hui.
+
+## v2.22.2
+- **web_search:** Gemini ka free limit (429) khatam hone par ab seedha web se nateeje laati hai (Google News RSS, DuckDuckGo, Bing, Wikipedia - key nahi chahiye). Ek baar limit lagne par 10 minute tak seedha web use hota hai.
+- **Termux:** agar `allow-external-apps=true` set nahi hai to ab saaf message milta hai (aur Divya wahi command user ko batati hai).
+- Divya ab Termux mein install ke liye script nahi maangti, khud commands nikaalkar chalati hai.
