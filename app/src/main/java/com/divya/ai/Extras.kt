@@ -46,7 +46,7 @@ fun CyCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() ->
 }
 
 @Composable
-private fun CyPage(title: String, content: @Composable ColumnScope.() -> Unit) {
+fun CyPage(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxSize().padding(14.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         val shape = RoundedCornerShape(14.dp)
         Box(Modifier.fillMaxWidth().clip(shape).background(CyDeep).border(1.5.dp, CyEdge, shape).padding(14.dp), contentAlignment = Alignment.Center) {

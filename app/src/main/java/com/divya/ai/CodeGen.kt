@@ -86,6 +86,7 @@ object CodeGen {
         val done = mutableListOf<String>(); val bad = mutableListOf<String>()
         for (i in 0 until arr.length()) {
             val f = arr.getJSONObject(i); val p = f.optString("path"); val body = f.optString("content")
+            BgTasks.feed(body)
             val err = CodeStore.write(c, project, p, body)
             if (err == null) done += p else { bad += err; Log.w(TAG, "skip: $err") }
         }
@@ -103,16 +104,19 @@ object CodeGen {
             "DEPLOY.md must give simple step-by-step Hinglish instructions to publish on GitHub Pages (create repo, upload files, Settings > Pages > main branch / root) and Netlify drop as alternative."
         val wa = whatsapp.filter { it.isDigit() }
         val waRule = if (wa.length >= 8) "\nMUST include a floating WhatsApp chat button (bottom-right, green, with inline SVG icon) linking to https://wa.me/$wa?text=Hello (opens in new tab), plus a WhatsApp contact link in the contact section." else ""
+        BgTasks.stage("Site plan + code likh rahi hoon…")
         val j = parse(ask(c, sys, "Website type: $kind\nRequirements: $description$waRule"))
         var name = CodeStore.safeName(j.optString("project").ifBlank { kind })
         if (CodeStore.listProjects(c).contains(name)) name += "-" + (System.currentTimeMillis() % 1000)
         val files = writeFiles(c, name, j).toMutableList()
         // Error dhundo aur ek baar khud theek karo
+        BgTasks.stage("Errors check kar rahi hoon…")
         var issues = CodeStore.lint(c, name)
         if (issues.isNotEmpty()) {
             Log.w(TAG, "lint: $issues")
             try { files += fix(c, name, issues.joinToString("; ")); issues = CodeStore.lint(c, name) } catch (e: GenError) { Log.w(TAG, "auto-fix fail: ${e.message}") }
         }
+        if (deploy && Deploy.hasToken(c)) BgTasks.stage("Live publish ho raha hai…")
         val live = if (deploy && Deploy.hasToken(c)) Deploy.netlify(c, name) else null
         "done: project '$name' bana (${files.distinct().size} files: ${files.distinct().joinToString()}). " + j.optString("summary") +
             (if (issues.isEmpty()) " Koi error nahi mila." else " Bache issues: ${issues.joinToString("; ")}") +
@@ -147,6 +151,17 @@ object CodeGen {
         }
     } catch (e: GenError) { Log.e(TAG, "edit", e); "failed: ${e.message}" }
     catch (e: Exception) { Log.e(TAG, "edit", e); "failed: ${e.javaClass.simpleName}: ${e.message}" }
+
+    /** Termux ke liye: task ka code (files list + kaise chalana hai) wapas do, kuch save nahi karta. */
+    fun genFiles(c: Context, task: String, filename: String): Pair<List<Pair<String, String>>, String> {
+        val sys = "You are a senior developer. Write the requested code as ONE file (or a few small files) with clear comments, for Termux on Android. Prefer Python standard library; put pip/pkg install commands in a comment at the top. " +
+            "Never include real secrets. Output ONLY JSON {\"files\":[{\"path\":\"name.ext\",\"content\":\"...\"}],\"how_to_run\":\"short Hinglish instructions\"}. Paths must be simple relative file names (letters, digits, dot, dash, underscore, slash). Allowed extensions: py, sh, js, html, css, json, md, txt."
+        val j = parse(ask(c, sys, "Task: $task\nPreferred filename: ${filename.ifBlank { "auto" }}"))
+        val arr = j.optJSONArray("files") ?: throw GenError("Model ne koi file nahi di.")
+        val out = (0 until arr.length()).map { val f = arr.getJSONObject(it); f.optString("path").trim().trimStart('/') to f.optString("content") }
+            .filter { it.first.isNotBlank() && !it.first.contains("..") }
+        return out to j.optString("how_to_run")
+    }
 
     /** Python / shell / html-css-js ki single file ya chhoti script. 'scripts' project mein jati hai. Run NAHI hoti. */
     fun generateCode(c: Context, task: String, filename: String): String = try {

@@ -59,7 +59,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
-enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, Journal, Study, Scan, About, Code, Preview, Guardian, Backup, ProChat, VoiceSettings, ManageApi, WakeWords }
+enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, Journal, Study, Scan, About, Code, Preview, Guardian, Backup, ProChat, VoiceSettings, ManageApi, WakeWords, Termux }
 
 class UiTheme(
     val name: String, val img: Int, val circle: Boolean, val bg: Brush, val text: Color, val accent: Color,
@@ -335,6 +335,7 @@ fun DivyaApp(ctx: Context) {
                 Screen.VoiceSettings -> VoiceSettingsScreen(th, prefs)
                 Screen.ManageApi -> ManageApiScreen(th, prefs)
                 Screen.WakeWords -> WakeWordsScreen(th, prefs)
+                Screen.Termux -> TermuxScreen(th, prefs)
                 Screen.Backup -> BackupScreen(th, ctx)
             } }
         }
@@ -352,6 +353,7 @@ fun DivyaApp(ctx: Context) {
         }
     }
     if (glowOn) GlowBorder(if (micNow) Color(0xFF00FF40) else th.accent, micNow)
+    BgOverlay()
     // Live screen sharing ka chhota button (session chalu hone par dikhta hai). ON hone par Divya aapki screen dekhti rehti hai.
     if (live.running && screen != Screen.Scan && screen != Screen.Chat && screen != Screen.ProChat) {
         Box(Modifier.align(Alignment.TopEnd).systemBarsPadding().padding(top = 4.dp, end = 10.dp)
@@ -557,6 +559,7 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     Btn(th, "🎙 Voice Settings (30 awaazein, pitch, speed, accent)") { openExtra(Screen.VoiceSettings) }
     Btn(th, "🔑 Manage API (Gemini, Claude, Grok, Groq…)") { openExtra(Screen.ManageApi) }
     Btn(th, "👂 Wake Words (apne wake word jodo)") { openExtra(Screen.WakeWords) }
+    Btn(th, "💻 Termux Control (Divya khud commands chalaye, code likhe)") { openExtra(Screen.Termux) }
     AnnounceSettings(th, prefs)
     Text("UI Design / Avatar (3D, Anime, Blue, Gold, Pink, Neon…)", color = th.accent, fontWeight = FontWeight.Bold)
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

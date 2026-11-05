@@ -235,7 +235,7 @@ fun CyberHome(th: UiTheme, status: String, live: Boolean, callName: String, onMi
                     verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text("DIVYA CONTROL CENTER", color = CyCyan, fontSize = 7.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     val cells = listOf(
-                        Triple(Icons.Filled.SmartToy, "AUTOMATION", Screen.Automate), Triple(Icons.Filled.Edit, "TASKS", Screen.Quick),
+                        Triple(Icons.Filled.SmartToy, "AUTOMATION", Screen.Automate), Triple(Icons.Filled.Terminal, "TERMUX", Screen.Termux),
                         Triple(Icons.Filled.QrCodeScanner, "SYSTEM SCAN", Screen.Scan), Triple(Icons.Filled.Apps, "APP LAUNCHER", Screen.Apps),
                         Triple(Icons.Filled.Mic, "WAKE WORDS", Screen.WakeWords), Triple(Icons.Filled.VpnKey, "MANAGE API", Screen.ManageApi))
                     for (r in 0 until 3) Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
