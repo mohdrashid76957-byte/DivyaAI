@@ -97,6 +97,18 @@ object Wallpapers {
         "Divya Kali wallpaper lag gaya. 🐉"
     } catch (e: Throwable) { "Kali wallpaper nahi lag paya: " + (e.message ?: e.javaClass.simpleName) }
 
+    /** Auto set na ho (vivo/launcher rok de) to phone ka apna "Set as wallpaper" chooser kholo. */
+    fun openChooser(c: Context): String = try {
+        val dir = java.io.File(c.cacheDir, "share").apply { mkdirs() }
+        val f = java.io.File(dir, "divya_kali_wall.jpg")
+        c.resources.openRawResource(R.drawable.divya_kali_wall).use { i -> f.outputStream().use { o -> i.copyTo(o) } }
+        val uri = androidx.core.content.FileProvider.getUriForFile(c, c.packageName + ".fileprovider", f)
+        val i = android.content.Intent(android.content.Intent.ACTION_ATTACH_DATA).setDataAndType(uri, "image/jpeg")
+            .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        c.startActivity(android.content.Intent.createChooser(i, "Wallpaper lagao").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        "Chooser khul gaya: Divya Kali wallpaper chuno aur Set karo."
+    } catch (e: Throwable) { "Chooser nahi khula: " + (e.message ?: e.javaClass.simpleName) }
+
     private fun has(t: String, vararg w: String) = w.any { t.contains(it) }
 
     /** t = lowercase command. Background thread se chalao (bitmap banta aur set hota hai). */

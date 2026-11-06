@@ -25,6 +25,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,7 +81,18 @@ fun AppsScreen(th: UiTheme, ctx: Context, prefs: SharedPreferences, setTheme: (I
         l.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); try { ctx.startActivity(l) } catch (_: Exception) {}
     }
     val kIdx = themes.indexOfFirst { it.name == "Kali Linux" }
+    // v2.22.19: pehli baar Apps screen khulte hi Kali theme + wallpaper khud lag jaye (ek hi baar)
+    LaunchedEffect(kIdx) {
+        if (kIdx >= 0 && !prefs.getBoolean("kaliAuto_22_19", false)) {
+            prefs.edit().putBoolean("kaliAuto_22_19", true).apply()
+            setTheme(kIdx); msg = "Kali theme lag gayi ✅ wallpaper laga rahi hoon…"
+            thread { val r = Wallpapers.setKali(ctx); android.os.Handler(android.os.Looper.getMainLooper()).post { msg = r } }
+        }
+    }
 
+    Box(Modifier.fillMaxSize()) {
+    // Kali wallpaper Apps screen ke peeche hamesha dikhe (theme koi bhi ho)
+    if (kali && th.wall == null) Image(painterResource(R.drawable.divya_kali_wall), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)) {
         // --- Options ---
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -89,6 +102,7 @@ fun AppsScreen(th: UiTheme, ctx: Context, prefs: SharedPreferences, setTheme: (I
                 msg = "Wallpaper laga rahi hoon…"
                 thread { val r = Wallpapers.setKali(ctx); android.os.Handler(android.os.Looper.getMainLooper()).post { msg = r } }
             }, { Text("🖼 Kali Wallpaper", fontSize = 12.sp) })
+            AssistChip({ msg = Wallpapers.openChooser(ctx) }, { Text("📲 Wallpaper (manual)", fontSize = 12.sp) })
         }
         if (msg.isNotEmpty()) Text(msg, color = KaliCyan, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
         if (kali) {
@@ -121,5 +135,6 @@ fun AppsScreen(th: UiTheme, ctx: Context, prefs: SharedPreferences, setTheme: (I
                 HorizontalDivider(color = th.accent.copy(alpha = 0.3f))
             } }
         }
+    }
     }
 }

@@ -418,3 +418,7 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - Kali Linux theme + Divya Kali wallpaper (Apps screen se ek tap mein home+lock par)
 - Divya Kali Launcher (neon hex icons, categories, search) Apps screen mein, toggle ke saath
 - About: sahi version (PackageManager se) + Latest Update card + Check update
+
+## v2.22.19
+- Kali theme + wallpaper ab Apps screen khulte hi khud lagte hain (ek baar); wallpaper Apps screen ke peeche hamesha dikhta hai
+- Naya "📲 Wallpaper (manual)" button: auto set na ho to phone ka Set-wallpaper chooser khulta hai
