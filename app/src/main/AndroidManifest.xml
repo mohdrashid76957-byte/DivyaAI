@@ -44,7 +44,12 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Divya ko phone ka Home screen (launcher) banane ke liye -->
+        </activity>
+        <!-- v2.22.22: Divya Kali Home = asli phone launcher (Kali wallpaper + neon hex icons + search + dock) -->
+        <activity android:name=".KaliHomeActivity" android:exported="true" android:label="Divya AI (Kali Home)"
+            android:launchMode="singleTask" android:stateNotNeeded="true" android:resumeWhilePausing="true"
+            android:taskAffinity="" android:excludeFromRecents="false" android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|density|fontScale|locale|layoutDirection">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />

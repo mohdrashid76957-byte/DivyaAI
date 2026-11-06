@@ -103,6 +103,7 @@ fun AppsScreen(th: UiTheme, ctx: Context, prefs: SharedPreferences, setTheme: (I
                 thread { val r = Wallpapers.setKali(ctx); android.os.Handler(android.os.Looper.getMainLooper()).post { msg = r } }
             }, { Text("🖼 Kali Wallpaper", fontSize = 12.sp) })
             AssistChip({ msg = Wallpapers.openChooser(ctx) }, { Text("📲 Wallpaper (manual)", fontSize = 12.sp) })
+            AssistChip({ msg = HomeRole.request(ctx) }, { Text("🏠 Phone Home banao", fontSize = 12.sp) })
         }
         if (msg.isNotEmpty()) Text(msg, color = KaliCyan, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
         if (kali) {

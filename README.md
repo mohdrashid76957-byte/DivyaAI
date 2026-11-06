@@ -428,3 +428,9 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 
 ## v2.22.21
 - Ice theme Home par bhi "Kali Launcher" tile (Search Anything ki jagah, NEW badge). Upar-left wale menu circle se bhi Apps screen khulti hai.
+
+## v2.22.22 - Kali style ab asli phone Home par
+- Naya **Divya Kali Home** (KaliHomeActivity) = asli launcher: Kali wallpaper, neon hex icons, search bar, categories, dock (Phone, Messages, Divya, Camera, Gallery). App se bahar/back karne par bhi yahi dikhta hai.
+- Zaroori ek baar: Divya > Kali Launcher screen > "🏠 Phone Home banao" (ya Kali Home ke upar gear menu > Default Home chuno) > "Divya AI (Kali Home)" chuno.
+- Limit: Android normal app ko vivo launcher ke icons badalne nahi deta, isliye Divya khud launcher banti hai. Purana launcher wapas chahiye to Phone Settings > Default apps > Home app.
+- Icon par long press: App info / Uninstall.
