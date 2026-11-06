@@ -383,10 +383,22 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - **Dhyan:** ye video ka exact copy nahi hai, uske jaisa design hai (video ki artwork/Iron Man wali picture nahi li). Wallpaper mein armor ki photo nahi, neon rings hain.
 - Compile aur phone par test nahi hua; build karke dekho. Ring ki speed / size `glow/HudOverlay.kt` mein `rings` list se badal sakte ho.
 
+## Orb style: Classic / 4DZINE
+- Settings > Voice orb ke neeche **Orb style** chips: `Classic` (purana gola) ya `4DZINE` (chaukor/tesseract style, quadrant arcs ghoomte hue).
+- Chip badalne par orb agle session se naye style mein dikhta hai. Default Classic hai.
+- Pref key: `orbStyle` (prefs "divya"). Code: `glow/HudOverlay.kt` (`draw4dzine`), `MainActivity.kt` (settings chips).
+
+## Orb rotation (video jaisa)
+- Voice orb ka kaanton wala ghera ab lagataar ghoomta hai (bahar ek disha mein, andar ulta), awaaz/thinking ke saath tez hota hai.
+- Code: `glow/HudOverlay.kt` (`jag(... rot)`), 4DZINE mein bhi quadrant arcs ghoomte hain.
+
 ## Voice Guardian fix (v2.22.13)
-- Owner ki awaaz ab match hoti hai: threshold ab naye bolne par bhi sahi nikalta hai (leave-one-out), pehle in-sample tha aur owner bhi block ho jaata tha.
+- Owner ki awaaz ab match hoti hai: threshold leave-one-out se nikalta hai (pehle in-sample tha).
 - Enrollment aur mic gate dono ek hi window (~0.6 sec) par compare karte hain.
 - Bahut kam absolute energy filter (mic gain par nirbhar nahi).
-- Chhoti baat ab pehle hi cut nahi hoti.
-- **Zaroori:** update ke baad Voice Lock / Guardian mein apni awaaz dobara enroll karo (purani model file naye threshold ke saath kaam nahi karegi).
-- Logcat tag `DivyaGuard` par har decision ka score dikhta hai (role, score, limit).
+- **Zaroori:** update ke baad apni awaaz dobara enroll karo.
+- Logcat tag `DivyaGuard` par har decision ka score dikhta hai.
+
+## Guardian "Pehle Divya ka mic band karo" bug fix (v2.22.14)
+- Guardian checks ab `MicBus` (asli mic state) par chalte hain, purane `WakeBus.liveActive` flag par nahi.
+- `MicBus` ko Gemini mic, offline mic aur Guardian recording set/reset karte hain.

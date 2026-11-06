@@ -169,6 +169,12 @@ object VoicePrint {
     /** Mic se `seconds` sec record (Gemini wale mic jaisa hi source). */
     @android.annotation.SuppressLint("MissingPermission")
     fun record(seconds: Int): ShortArray? {
+        MicBus.recording = true
+        try { return recordInner(seconds) } finally { MicBus.recording = false }
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun recordInner(seconds: Int): ShortArray? {
         val total = SR * seconds
         val minBuf = AudioRecord.getMinBufferSize(SR, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val r = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, SR, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, max(minBuf, 8000) * 2)

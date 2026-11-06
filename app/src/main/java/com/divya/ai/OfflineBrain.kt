@@ -101,7 +101,7 @@ class OfflineBrain(
         if (!LicenseGate.isActive(ctx)) { onStatus("License activate karo"); return }
         if (!micOk(ctx)) { onStatus("Mic permission do"); return }
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) { onStatus("Is phone mein speech recognition nahi hai"); return }
-        active = true; WakeBus.liveActive = true; lastHeard = now(); errs = 0
+        active = true; MicBus.offlineMic = true; WakeBus.liveActive = true; lastHeard = now(); errs = 0
         langIdx = p.getInt("offLangIdx", 0).coerceIn(0, langs.size - 1)
         mode = p.getInt("offMode", if (Build.VERSION.SDK_INT >= 33) 0 else 1).coerceIn(0, 2); noMatch = 0
         if (Build.VERSION.SDK_INT >= 33) probeLangs()
@@ -126,6 +126,7 @@ class OfflineBrain(
         try { tts?.stop() } catch (_: Exception) {}
         speaking = false; doneCb = null; pending = null; OfflineFeatures.reset()
         active = false
+        MicBus.offlineMic = false
         WakeBus.liveActive = false
         onStatus(msg)
     }

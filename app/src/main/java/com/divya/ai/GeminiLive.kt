@@ -553,7 +553,7 @@ class GeminiLive(
             val r = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, 16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, min * 4)
             if (r.state != AudioRecord.STATE_INITIALIZED) { r.release(); state("Mic start nahi hua: mic permission ya dusri app check karo"); return }
             try { if (android.media.audiofx.AcousticEchoCanceler.isAvailable()) android.media.audiofx.AcousticEchoCanceler.create(r.audioSessionId)?.enabled = true } catch (_: Exception) {}
-            rec = r; r.startRecording(); micOn = true; updateGlow(); AvatarBus.moveTo(1)
+            rec = r; r.startRecording(); micOn = true; MicBus.geminiMic = true; updateGlow(); AvatarBus.moveTo(1)
             state("🎤 Bolo, Divya sun rahi hai…")
             Thread {
               try {
@@ -601,7 +601,7 @@ class GeminiLive(
 
     fun stop(msg: String = "Tap to Talk") {
         if (!running) return
-        running = false; ready = false; micOn = false; WakeBus.liveActive = false
+        running = false; ready = false; micOn = false; MicBus.geminiMic = false; WakeBus.liveActive = false
         screenShare = false; ShareBus.on = false; try { shareThread?.interrupt() } catch (_: Exception) {}; shareThread = null
         try { ws?.close(1000, null) } catch (_: Exception) {}
         try { rec?.stop(); rec?.release() } catch (_: Exception) {}

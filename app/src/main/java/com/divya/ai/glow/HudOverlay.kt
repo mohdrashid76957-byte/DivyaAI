@@ -49,7 +49,9 @@ object HudOverlay {
         else { val dm = android.util.DisplayMetrics(); @Suppress("DEPRECATION") manager.defaultDisplay.getRealMetrics(dm); sw = dm.widthPixels; sh = dm.heightPixels }
         val w = (minOf(sw, sh) * 0.92f).toInt()
         val h = (w * 0.92f).toInt()
-        val halo = base.getSharedPreferences("divya", 0).getBoolean("hudDim", true)
+        val prefs = base.getSharedPreferences("divya", 0)
+        val halo = prefs.getBoolean("hudDim", true)
+        val orb = prefs.getString("orbStyle", "classic") ?: "classic"
         val l = WindowManager.LayoutParams(
             w, h, type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -62,7 +64,7 @@ object HudOverlay {
         l.gravity = android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL
         // orb ka kendra screen ki ~72% unchai par (video mein dock ke thoda upar), pill uske neeche
         l.y = (sh * 0.72f - h * HudView.CY).toInt().coerceAtLeast(0)
-        val v = HudView(base).also { it.state = state; it.halo = halo }
+        val v = HudView(base).also { it.state = state; it.halo = halo; it.style = orb }
         try { manager.addView(v, l) } catch (_: Exception) { return }
         wm = manager; view = v
     }
@@ -82,6 +84,8 @@ private class HudView(ctx: Context) : View(ctx) {
 
     var state: GlowState = GlowState.IDLE
     var halo = true
+    /** "classic" = purana gola + kaante; "4dzine" = chaukor/tesseract style orb */
+    var style = "classic"
 
     private val N = 72
     private val dp = ctx.resources.displayMetrics.density
@@ -131,10 +135,10 @@ private class HudView(ctx: Context) : View(ctx) {
     }
 
     /** Kaante jaisa naachta kinara: har point ka radius random target ki taraf smooth hota hai, awaaz se amp badhta hai. */
-    private fun jag(c: Canvas, cx: Float, cy: Float, r: Float, arr: FloatArray, amp: Float, sw: Float, a: Float) {
+    private fun jag(c: Canvas, cx: Float, cy: Float, r: Float, arr: FloatArray, amp: Float, sw: Float, a: Float, rot: Float = 0f) {
         path.reset()
         for (i in 0 until N) {
-            val ang = i * 2f * PI.toFloat() / N
+            val ang = i * 2f * PI.toFloat() / N + rot
             val rr = r * (1f + amp * arr[i])
             val x = cx + rr * cos(ang); val y = cy + rr * sin(ang)
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
@@ -208,23 +212,74 @@ private class HudView(ctx: Context) : View(ctx) {
         line.color = col; line.strokeWidth = 1.6f * dp; line.alpha = (255f * (0.22f + 0.70f * think) * ga).toInt()
         for (kk in 0 until 3) c.drawArc(oval, spin * 55f + kk * 120f, 38f, false, line)
 
+        if (style == "4dzine") {
+            draw4dzine(c, cx, cy, r, ga)
+        } else {
         // gola (dark teal, shishe jaisa)
         circle(c, cx, cy, r, mix(col, Color.BLACK, 0.80f), 0.88f * ga)
         circle(c, cx, cy, r * 0.72f, mix(col, Color.BLACK, 0.62f), 0.40f * ga)
         circle(c, cx, cy, r * 0.40f, mix(col, Color.BLACK, 0.45f), 0.30f * ga)
 
         // kaante jaisa naachta kinara (do layer)
-        jag(c, cx, cy, r, cur, amp, 1.6f * dp, 0.95f * ga)
-        jag(c, cx, cy, r * 0.93f, cur2, amp * 0.8f, 1.0f * dp, 0.50f * ga)
+        // video jaisa: kaanton wala ghera lagataar ghoomta hai (bahar ek taraf, andar ulta)
+        jag(c, cx, cy, r, cur, amp, 1.6f * dp, 0.95f * ga, spin * 3.0f)
+        jag(c, cx, cy, r * 0.93f, cur2, amp * 0.8f, 1.0f * dp, 0.50f * ga, -spin * 2.2f)
 
         // beech ka chamakta dot
         val dr = (3.2f + 4.5f * lvl) * dp
         circle(c, cx, cy, dr * 3.2f, col, 0.10f * ga)
         circle(c, cx, cy, dr * 1.9f, col, 0.22f * ga)
         circle(c, cx, cy, dr, mix(col, Color.WHITE, 0.30f), 1f * ga)
+        }
 
         drawCaption(c, w, h, dt, now, ga)
         postInvalidateOnAnimation()
+    }
+
+    /**
+     * 4DZINE orb: do chaukor (bahar wala ghoomta hai, andar wala ulta) jinke kone jude hue hain,
+     * jaise ek 4D (tesseract) ka projection. Chaar quadrant arcs bahar ghoomte hain.
+     * Awaaz ke saath chaukor bada/chamakta hai.
+     */
+    private fun draw4dzine(c: Canvas, cx: Float, cy: Float, r: Float, ga: Float) {
+        val ro = r * 1.02f
+        val ri = r * 0.50f
+        val a = spin * 60f
+        val outer = Path()
+        val inner = Path()
+        val ox = FloatArray(4); val oy = FloatArray(4)
+        val ix = FloatArray(4); val iy = FloatArray(4)
+        for (k in 0 until 4) {
+            val ang = Math.toRadians((a + k * 90.0)).toFloat()
+            ox[k] = cx + ro * cos(ang); oy[k] = cy + ro * sin(ang)
+            val ang2 = Math.toRadians((-a * 1.6 + 45.0 + k * 90.0)).toFloat()
+            ix[k] = cx + ri * cos(ang2); iy[k] = cy + ri * sin(ang2)
+            if (k == 0) { outer.moveTo(ox[k], oy[k]); inner.moveTo(ix[k], iy[k]) }
+            else { outer.lineTo(ox[k], oy[k]); inner.lineTo(ix[k], iy[k]) }
+        }
+        outer.close(); inner.close()
+
+        // andar ka chaukor: halka bharav (fill)
+        fill.color = mix(col, Color.BLACK, 0.78f); fill.alpha = (255f * 0.85f * ga).toInt().coerceIn(0, 255)
+        c.drawPath(inner, fill)
+        fill.color = mix(col, Color.BLACK, 0.72f); fill.alpha = (255f * 0.80f * ga).toInt().coerceIn(0, 255)
+        c.drawPath(outer, fill)
+
+        // kone jodne wali lines (tesseract ki depth)
+        line.color = col; line.strokeWidth = 1.1f * dp; line.alpha = (255f * 0.55f * ga).toInt().coerceIn(0, 255)
+        for (k in 0 until 4) c.drawLine(ox[k], oy[k], ix[k], iy[k], line)
+
+        // chaukor ki neon outline
+        line.strokeWidth = 1.6f * dp; line.alpha = (255f * 0.95f * ga).toInt().coerceIn(0, 255); c.drawPath(outer, line)
+        line.strokeWidth = 1.2f * dp; line.alpha = (255f * 0.7f * ga).toInt().coerceIn(0, 255); c.drawPath(inner, line)
+
+        // chaar quadrant arcs, bahar ki taraf ghoomte hue
+        oval.set(cx - r * 1.45f, cy - r * 1.45f, cx + r * 1.45f, cy + r * 1.45f)
+        line.strokeWidth = 2.2f * dp
+        for (k in 0 until 4) {
+            line.alpha = (255f * (0.55f + 0.35f * think) * ga).toInt().coerceIn(0, 255)
+            c.drawArc(oval, -a * 0.7f + k * 90f + 8f, 66f, false, line)
+        }
     }
 
     private fun captionText(now: Long): String {

@@ -611,6 +611,15 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
         Text("Orb ke peeche halka andhera (orb chhota rehta hai, touch/Back neeche ke app ko hi jaata hai)", color = th.text, modifier = Modifier.weight(1f))
         Switch(hdd, { hdd = it; prefs.edit().putBoolean("hudDim", it).apply(); com.divya.ai.glow.HudOverlay.hide() })
     }
+    var orbSt by remember { mutableStateOf(prefs.getString("orbStyle", "classic") ?: "classic") }
+    Text("Orb style (agle session se lagta hai)", color = th.text, fontSize = 13.sp)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("classic" to "Classic", "4dzine" to "4DZINE").forEach { (key, label) ->
+            FilterChip(orbSt == key, {
+                orbSt = key; prefs.edit().putString("orbStyle", key).apply(); com.divya.ai.glow.HudOverlay.hide()
+            }, { Text(label, fontSize = 11.sp) })
+        }
+    }
     Text("Ring ke liye Accessibility ya 'Display over other apps' permission ON honi chahiye.", color = th.text.copy(alpha = 0.6f), fontSize = 11.sp)
     var fl by remember { mutableStateOf(prefs.getBoolean("float", false)) }
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -660,7 +669,7 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     Btn(th, if (vpBusy) "Chal raha hai..." else "Meri awaaz record karo (20 sec)") {
         if (vpBusy) return@Btn
         if (!micOk(sctx)) { Toast.makeText(sctx, "Pehle Microphone permission do", Toast.LENGTH_LONG).show(); return@Btn }
-        if (WakeBus.liveActive) { Toast.makeText(sctx, "Pehle Divya ka mic band karo (stop)", Toast.LENGTH_LONG).show(); return@Btn }
+        if (MicBus.busy()) { Toast.makeText(sctx, "Pehle Divya ka mic band karo (stop)", Toast.LENGTH_LONG).show(); return@Btn }
         vpBusy = true; vpMsg = "🎤 20 sec lagatar bolte raho (kuch bhi, normal awaaz mein)..."
         val h = android.os.Handler(android.os.Looper.getMainLooper())
         Thread {
@@ -679,7 +688,7 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
         if (vpBusy) return@Btn
         val md = VoicePrint.load(prefs)
         if (md == null) { Toast.makeText(sctx, "Pehle awaaz record karo", Toast.LENGTH_LONG).show(); return@Btn }
-        if (!micOk(sctx) || WakeBus.liveActive) { Toast.makeText(sctx, "Mic permission do / Divya ka mic band karo", Toast.LENGTH_LONG).show(); return@Btn }
+        if (!micOk(sctx) || MicBus.busy()) { Toast.makeText(sctx, "Mic permission do / Divya ka mic band karo", Toast.LENGTH_LONG).show(); return@Btn }
         vpBusy = true; vpMsg = "🎤 4 sec bolo..."
         val h = android.os.Handler(android.os.Looper.getMainLooper())
         Thread {
@@ -929,7 +938,7 @@ fun GuardianScreen(th: UiTheme, prefs: android.content.SharedPreferences, ctx: C
 
     fun micReady(): Boolean {
         if (!micOk(ctx)) { Toast.makeText(ctx, "Pehle Microphone permission do", Toast.LENGTH_LONG).show(); return false }
-        if (WakeBus.liveActive) { Toast.makeText(ctx, "Pehle Divya ka mic band karo (stop)", Toast.LENGTH_LONG).show(); return false }
+        if (MicBus.busy()) { Toast.makeText(ctx, "Pehle Divya ka mic band karo (stop)", Toast.LENGTH_LONG).show(); return false }
         return true
     }
 
