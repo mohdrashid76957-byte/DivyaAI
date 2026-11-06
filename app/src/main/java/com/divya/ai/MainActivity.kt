@@ -63,7 +63,7 @@ enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, J
 
 class UiTheme(
     val name: String, val img: Int, val circle: Boolean, val bg: Brush, val text: Color, val accent: Color,
-    val greet: String, val menu: List<Triple<String, Screen, ImageVector>>, val hud: Boolean = false, val maya: Boolean = false, val neon: Boolean = false, val ice: Boolean = false, val cyber: Boolean = false
+    val greet: String, val menu: List<Triple<String, Screen, ImageVector>>, val hud: Boolean = false, val maya: Boolean = false, val neon: Boolean = false, val ice: Boolean = false, val cyber: Boolean = false, val wall: Int? = null
 )
 
 val themes = listOf(
@@ -141,7 +141,11 @@ val themes = listOf(
     // Cyber HUD: dark navy + cyan neon, Core Systems gauges + Control Center (reference photo se)
     UiTheme("Cyber HUD", R.drawable.divya_ice, false,
         Brush.verticalGradient(listOf(Color(0xFF020B14), Color(0xFF041B2B), Color(0xFF020B14))), Color.White, Color(0xFF19E3F0),
-        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), cyber = true)
+        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), cyber = true),
+    // Kali Linux: kala + electric neela neon, dragon/hacker-girl wallpaper (Divya Kali theme)
+    UiTheme("Kali Linux", R.drawable.divya_av_blue, false,
+        Brush.verticalGradient(listOf(Color(0xFF000208), Color(0xFF020B2D), Color(0xFF000208))), Color.White, Color(0xFF2F8BFF),
+        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), neon = true, wall = R.drawable.divya_kali_wall)
 )
 
 class MainActivity : ComponentActivity() {
@@ -314,6 +318,7 @@ fun DivyaApp(ctx: Context) {
         }
     }
     Box(Modifier.fillMaxSize().background(th.bg)) {
+    if (th.wall != null) Image(painterResource(th.wall), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
     Column(Modifier.fillMaxSize().systemBarsPadding()) {
         Box(Modifier.weight(1f)) {
             // Screen badalne par smooth fade + slide
@@ -340,7 +345,7 @@ fun DivyaApp(ctx: Context) {
                 Screen.ProChat -> ProChatScreen(th) { screen = Screen.Code }
                 Screen.Journal -> JournalScreen(th, prefs)
                 Screen.Study -> StudyScreen(th)
-                Screen.Apps -> AppsScreen(th, ctx)
+                Screen.Apps -> AppsScreen(th, ctx, prefs, { themeIdx = it; prefs.edit().putInt("theme2", it).apply() })
                 Screen.Quick -> QuickScreen(th, ctx, { screen = Screen.Scan }) { screen = Screen.Code }
                 Screen.Code -> CodeScreen(th, ctx) { CodeBus.previewProject = it; CodeBus.previewTick++; screen = Screen.Preview }
                 Screen.Preview -> PreviewScreen(th, ctx, CodeBus.previewProject ?: "", CodeBus.previewTick) { screen = Screen.Code }
@@ -508,20 +513,6 @@ fun ChatScreen(th: UiTheme, msgs: List<Pair<String, String>>, online: Boolean, s
                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = th.text, unfocusedTextColor = th.text))
             IconButton({ if (t.isNotBlank()) { send(t.trim()); t = "" } }) { Icon(Icons.Filled.Send, "Send", tint = th.accent) }
         }
-    }
-}
-
-@Composable
-fun AppsScreen(th: UiTheme, ctx: Context) {
-    val pm = ctx.packageManager
-    val apps = remember { pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-        .map { it.loadLabel(pm).toString() }.distinct().sorted() }
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Open Apps", color = th.text, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-        LazyColumn { items(apps) { n ->
-            Text(n, color = th.text, modifier = Modifier.fillMaxWidth().clickable { Actions.openApp(ctx, n) }.padding(vertical = 12.dp))
-            HorizontalDivider(color = th.accent.copy(alpha = 0.3f))
-        } }
     }
 }
 

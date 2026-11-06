@@ -413,3 +413,8 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - Match limit ab kabhi 1.5 se kam nahi hota (`VoicePrint.limit`), chahe purani saved awaaz ka threshold chhota ho. Purane saved model ke saath bhi owner ki awaaz match hogi.
 - Sensitivity slider (Match strictness) ab is minimum ke upar kaam karta hai.
 - Logcat `DivyaGuard` par limit dikhega; agar ab bhi match na ho to wo number bhejo.
+
+## v2.22.18
+- Kali Linux theme + Divya Kali wallpaper (Apps screen se ek tap mein home+lock par)
+- Divya Kali Launcher (neon hex icons, categories, search) Apps screen mein, toggle ke saath
+- About: sahi version (PackageManager se) + Latest Update card + Check update

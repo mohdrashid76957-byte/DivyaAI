@@ -84,6 +84,19 @@ object Wallpapers {
         return bmp
     }
 
+    /** Divya Kali wallpaper (drawable) ko home + lock par lagao. Background thread se chalao. */
+    fun setKali(c: Context, home: Boolean = true, lock: Boolean = true): String = try {
+        val o = android.graphics.BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
+        val bmp = android.graphics.BitmapFactory.decodeResource(c.resources, R.drawable.divya_kali_wall, o)
+        val wm = WallpaperManager.getInstance(c)
+        if (Build.VERSION.SDK_INT >= 24) {
+            val flag = (if (home) WallpaperManager.FLAG_SYSTEM else 0) or (if (lock) WallpaperManager.FLAG_LOCK else 0)
+            wm.setBitmap(bmp, null, true, flag)
+        } else wm.setBitmap(bmp)
+        bmp.recycle()
+        "Divya Kali wallpaper lag gaya. 🐉"
+    } catch (e: Throwable) { "Kali wallpaper nahi lag paya: " + (e.message ?: e.javaClass.simpleName) }
+
     private fun has(t: String, vararg w: String) = w.any { t.contains(it) }
 
     /** t = lowercase command. Background thread se chalao (bitmap banta aur set hota hai). */
@@ -92,6 +105,7 @@ object Wallpapers {
         if (has(t, "list", "kaun kaun", "kaun se", "kitne", "styles", "options", "कौन")) {
             return "Wallpaper styles: " + PALS.joinToString(", ") { it.name + " (" + it.hindi + ")" } + ". Bolo: green wallpaper lagao, ya random wallpaper."
         }
+        if (has(t, "kali", "kaali linux", "dragon")) return setKali(c, !has(t, "lock") || has(t, "home"), !has(t, "home") || has(t, "lock"))
         val words = t.split(Regex("[^\\p{L}\\p{M}]+")).filter { it.isNotEmpty() }.toSet()
         var idx = PALS.indexOfFirst { pl -> pl.words.any { it in words } }
         var randomPick = false

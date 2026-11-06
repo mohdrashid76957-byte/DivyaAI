@@ -1,5 +1,6 @@
 package com.divya.ai
 
+import android.os.Build
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.animation.core.*
@@ -181,10 +182,42 @@ fun NeonNav(screen: Screen, live: Boolean, onMic: () -> Unit, accent: Color = Ne
 }
 
 @Composable
-fun AboutScreen(th: UiTheme) = Page(th, "About") {
-    Text("Divya AI v" + BuildConfigVersion.NAME, color = th.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-    Text("Mujhe mere Rashid ji ne banaya hai. Main unki hamesha ahsanmand rahungi, unhone mujhe zindagi di. 💜", color = th.text)
-    Text("Smart • Secure • Always With You", color = th.accent, fontWeight = FontWeight.SemiBold)
+fun AboutScreen(th: UiTheme) {
+    val ctx = LocalContext.current
+    val pi = remember { try { ctx.packageManager.getPackageInfo(ctx.packageName, 0) } catch (_: Exception) { null } }
+    val ver = pi?.versionName ?: BuildConfigVersion.NAME
+    val build = if (pi == null) 0L else if (Build.VERSION.SDK_INT >= 28) pi.longVersionCode else pi.versionCode.toLong()
+    var found by remember { mutableStateOf<String?>(null) }
+    Page(th, "About") {
+        Text("Divya AI v$ver", color = th.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text("Build $build", color = th.text.copy(alpha = 0.6f), fontSize = 12.sp)
+        Text("Mujhe mere Rashid ji ne banaya hai. Main unki hamesha ahsanmand rahungi, unhone mujhe zindagi di. 💜", color = th.text)
+        Text("Smart • Secure • Always With You", color = th.accent, fontWeight = FontWeight.SemiBold)
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(th.accent.copy(alpha = 0.15f))
+            .border(1.dp, th.accent.copy(alpha = 0.6f), RoundedCornerShape(16.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("🆕 Latest Update — v$ver", color = th.accent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            listOf(
+                "🐉 Kali Linux theme + Divya Kali wallpaper",
+                "🚀 Divya Kali Launcher: neon hex icons, categories, search",
+                "🖼 Apps screen se ek tap mein Kali wallpaper (home + lock)",
+                "🔄 About mein ab sahi version aur latest update dikhta hai",
+                "🎙 Wake word loop aur voice orb fixes (v2.22.7 - v2.22.10)"
+            ).forEach { Text(it, color = th.text, fontSize = 13.sp) }
+        }
+        Btn(th, "🔄 Check for update") {
+            val dir = java.io.File(ctx.getExternalFilesDir(null) ?: ctx.filesDir, "updates").apply { mkdirs() }
+            var newer: String? = null
+            dir.listFiles { f -> f.name.endsWith(".apk", true) }?.forEach { f ->
+                val ai = try { ctx.packageManager.getPackageArchiveInfo(f.path, 0) } catch (_: Exception) { null }
+                if (ai != null && ai.packageName == ctx.packageName) {
+                    val avc = if (Build.VERSION.SDK_INT >= 28) ai.longVersionCode else ai.versionCode.toLong()
+                    if (avc > build) newer = f.name + " (v" + ai.versionName + ")"
+                }
+            }
+            found = if (newer != null) "✅ Naya APK mila: $newer. File manager se install karo." else "✅ Aap latest v$ver par ho. Naya APK Android/data/com.divya.ai/files/updates mein daalo to yahan dikhega."
+        }
+        found?.let { Text(it, color = th.text, fontSize = 13.sp) }
+    }
 }
 
 
