@@ -699,7 +699,7 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
             val sc = if (fr.size >= VoicePrint.MIN_VOICED) VoicePrint.matchScore(md, fr) else -1.0
             h.post {
                 vpBusy = false
-                val lim = md.thr * prefs.getFloat("vpSens", 1f)
+                val lim = VoicePrint.limit(md, prefs.getFloat("vpSens", 1f))
                 vpMsg = if (sc < 0) "Awaaz bahut kam mili, thoda zor se bolo"
                     else "Score ${"%.1f".format(sc)} / limit ${"%.1f".format(lim)} → " + (if (sc <= lim) "✅ MATCH" else "❌ match nahi")
             }

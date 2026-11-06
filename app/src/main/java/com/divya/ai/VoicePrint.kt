@@ -20,6 +20,9 @@ object VoicePrint {
     const val WIN = 60
     /** Itne bolne wale frames se kam ho to awaaz pakki nahi hoti. */
     const val MIN_VOICED = 30
+    /** Limit kabhi bhi is se kam nahi hoga, chahe purani saved awaaz ka threshold kitna bhi chhota ho. */
+    const val MIN_LIMIT = 1.5
+    fun limit(md: VpModel, sens: Float): Double = max(md.thr * sens, MIN_LIMIT)
 
     private val window = DoubleArray(FRAME) { 0.54 - 0.46 * cos(2 * PI * it / (FRAME - 1)) }
     private val melBank: Array<DoubleArray> = buildMel()

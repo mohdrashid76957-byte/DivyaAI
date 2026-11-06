@@ -100,7 +100,7 @@ object VoiceGuardian {
         val sens = p.getFloat("vpSens", 1f)
         var bestRole = "unknown"; var bestName = ""; var bestRatio = Double.MAX_VALUE; var bestSc = 0.0; var bestLim = 1.0
         for ((role, name, md) in people) {
-            val sc = VoicePrint.matchScore(md, fr); val lim = md.thr * sens
+            val sc = VoicePrint.matchScore(md, fr); val lim = VoicePrint.limit(md, sens)
             val ratio = sc / lim
             if (ratio < bestRatio) { bestRatio = ratio; bestRole = role; bestName = name; bestSc = sc; bestLim = lim }
         }

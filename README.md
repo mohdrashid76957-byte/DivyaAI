@@ -408,3 +408,8 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - Test button ab wahi scoring use karta hai jo gate karta hai (consistent).
 - Threshold ka minimum floor 1.5 (normal bolne ka variation cover karne ke liye).
 - **Zaroori:** purani saved awaaz ka limit purane formula se hai, isliye apni awaaz dobara enroll karo.
+
+## Voice match limit fix (v2.22.17)
+- Match limit ab kabhi 1.5 se kam nahi hota (`VoicePrint.limit`), chahe purani saved awaaz ka threshold chhota ho. Purane saved model ke saath bhi owner ki awaaz match hogi.
+- Sensitivity slider (Match strictness) ab is minimum ke upar kaam karta hai.
+- Logcat `DivyaGuard` par limit dikhega; agar ab bhi match na ho to wo number bhejo.
