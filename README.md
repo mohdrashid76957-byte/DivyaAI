@@ -330,3 +330,12 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - *Offline IoT hub*: asli devices chahiye; Android 9+ par plain http bhi blocked hai.
 - *Real blockchain wallet, "Edge Cloud", "Multi-OS layer", "Self-optimizing core"*: marketing text hai, asli feature nahi banta.
 - Wi-Fi / Bluetooth on-off: Android 10+ mein app seedha on/off nahi kar sakti, isliye settings page khulta hai (pehle jaisa).
+
+## v2.22.4 - baaki features (jo Android mein sach mein ban sakte the)
+**Ye bhi is session mein compile nahi hua. Naye ML Kit dependencies (`image-labeling:17.0.9`, `face-detection:16.1.7`, `translate:17.0.3`) ke version Gradle sync mein check karo; na milen to Android Studio jo version suggest kare wo daal do.**
+- **Image analysis (objects + chehre):** "last scan analyze karo" / "photo mein kya hai". Aakhri Scanner photo (Document / Gallery scan) par kaam karta hai; model app ke andar bundled hai, offline. Text OCR pehle se tha.
+- **Translation (~20 languages):** "translate good morning to french". Hindi/English ke aam phrases phrasebook se turant; baaki ML Kit se. Har language ka model pehli baar internet se download hota hai, phir offline. 100+ languages ML Kit support nahi karta.
+- **App lock / Face lock:** "app lock on". Ye phone ka apna PIN / fingerprint / face use karta hai (app kholte time, 30 sec grace). Phone mein screen lock set hona zaroori.
+- **Live wallpaper:** "live wallpaper lagao". Neon chalte particles; simple animation hai, AI nahi.
+
+**Ab bhi NAHI bane:** offline local AI chat model (1-4 GB model), IoT hub, real blockchain wallet, Edge Cloud, Multi-OS layer, multi-language UI, Jarvis-style avatar animation (avatar ki audio-reactive animation pehle se hai).

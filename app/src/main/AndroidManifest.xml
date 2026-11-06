@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
@@ -62,6 +63,11 @@
         <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>
         </receiver>
+        <service android:name=".DivyaWallpaper" android:exported="true" android:label="Divya Neon Wallpaper"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/divya_wallpaper" />
+        </service>
         <service android:name=".LiveKeepService" android:exported="false" android:foregroundServiceType="microphone|location" />
         <service android:name=".WakeService" android:exported="false" android:foregroundServiceType="microphone" />
         <service android:name=".DivyaNotifListener" android:exported="true" android:label="Divya AI"

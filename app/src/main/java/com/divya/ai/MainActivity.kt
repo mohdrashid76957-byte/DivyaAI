@@ -145,6 +145,25 @@ val themes = listOf(
 )
 
 class MainActivity : ComponentActivity() {
+    private var lastAuthAt = 0L
+    private var authBusy = false
+    private val authLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        authBusy = false
+        if (r.resultCode == RESULT_OK) lastAuthAt = System.currentTimeMillis() else finish()
+    }
+
+    /** App lock / Face lock: phone ka apna PIN, fingerprint ya face (Settings mein "app lock on" bolo). */
+    override fun onResume() {
+        super.onResume()
+        if (getSharedPreferences("divya", 0).getBoolean("appLock", false) && !authBusy && System.currentTimeMillis() - lastAuthAt > 30_000L) {
+            val km = getSystemService(android.app.KeyguardManager::class.java)
+            if (km != null && km.isDeviceSecure) {
+                val i = km.createConfirmDeviceCredentialIntent("Divya AI", "Phone ke PIN, fingerprint ya face se kholo")
+                if (i != null) { authBusy = true; authLauncher.launch(i) }
+            }
+        }
+    }
+
     override fun onCreate(s: Bundle?) {
         super.onCreate(s)
         CrashLog.install(this)

@@ -2,7 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "com.divya.ai"
     compileSdk = 34
-    defaultConfig { applicationId = "com.divya.ai"; minSdk = 26; targetSdk = 34; versionCode = 46; versionName = "2.22.3" }
+    defaultConfig { applicationId = "com.divya.ai"; minSdk = 26; targetSdk = 34; versionCode = 47; versionName = "2.22.4" }
     signingConfigs {
         getByName("debug") {
             if (file("divya.keystore").exists()) {
@@ -35,4 +35,8 @@ dependencies {
     // OCR (text padhna): Latin/English + Devanagari/Hindi, phone par hi (offline)
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.mlkit:text-recognition-devanagari:16.0.1")
+    // Image analysis (objects + faces, bundled = offline) aur translation (model pehli baar download)
+    implementation("com.google.mlkit:image-labeling:17.0.9")
+    implementation("com.google.mlkit:face-detection:16.1.7")
+    implementation("com.google.mlkit:translate:17.0.3")
 }

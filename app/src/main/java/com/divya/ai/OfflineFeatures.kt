@@ -1,6 +1,9 @@
 package com.divya.ai
 
 import android.app.ActivityManager
+import android.app.KeyguardManager
+import android.app.WallpaperManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -89,6 +92,25 @@ object OfflineFeatures {
                 if (top.isEmpty()) "Ab tak $total command suni. Naye features ka use hua nahi."
                 else "Ab tak $total command. Sabse zyada: " + top.joinToString(", ") { it.first + " " + it.second + " baar" } + ". Ye data sirf phone mein hai."
             } catch (e: Exception) { "Analytics padh nahi paayi." }
+        }
+
+        // ---- v2.22.4: app/face lock, live wallpaper, image analysis ----
+        if (has(t, "app lock", "face lock", "fingerprint lock", "biometric lock", "ऐप लॉक")) {
+            bump(c, "applock")
+            val off = has(t, "off", "band", "hata", "बंद")
+            val km = c.getSystemService(KeyguardManager::class.java)
+            if (!off && (km == null || !km.isDeviceSecure)) return "Pehle phone mein screen lock (PIN, fingerprint ya face) set karo, tabhi app lock chalega."
+            prefs(c).edit().putBoolean("appLock", !off).apply()
+            return if (off) "App lock band." else "App lock ON. Ab app kholne par phone ka PIN, fingerprint ya face poochha jayega."
+        }
+        if (has(t, "live wallpaper", "wallpaper lagao", "neon wallpaper")) {
+            bump(c, "wallpaper")
+            startAct(c, Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
+                .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(c, DivyaWallpaper::class.java)))
+            return "Divya Neon wallpaper ka preview khol diya, 'Set wallpaper' dabao."
+        }
+        if (has(t, "image analysis", "photo analy", "image analy", "last scan analy", "faces gino", "objects batao", "photo mein kya hai")) {
+            bump(c, "imganalysis"); return MlTools.analyzeLastScan(c)
         }
 
         // ---- system health / resource monitor ----
@@ -786,21 +808,25 @@ object OfflineFeatures {
     )
 
     private fun translate(t: String): String {
-        val toHi = has(t, "hindi") && !has(t, "from hindi", "hindi se")
-        val toEn = has(t, "english", "angrezi") && !toHi
+        val target = MlTools.LANGS.keys.firstOrNull { has(t, "to $it", "in $it", "into $it", "$it mein", "$it me", "ka $it") }
+            ?: (if (has(t, "angrezi")) "english" else null)
         var p = t
-        for (w in listOf("translate", "translation", "anuvad", "अनुवाद", "to hindi", "in hindi", "hindi mein", "hindi me", "ka hindi", "into hindi",
-            "to english", "in english", "english mein", "english me", "ka english", "into english", "bolo", "batao", "karo", "hindi", "english", "angrezi", "please"))
+        for (w in listOf("translate", "translation", "anuvad", "अनुवाद", "bolo", "batao", "karo", "please", "angrezi"))
             p = p.replace(w, " ")
+        p = p.replace(Regex("\\b(in|to|into|ka|mein|me)\\b"), " ")
+        for (l in MlTools.LANGS.keys) p = p.replace(l, " ")
         p = p.replace(Regex("\\s+"), " ").trim()
         if (p.isBlank()) return "Kya translate karna hai? Jaise: translate good morning to hindi."
-        if (toHi || !toEn) {
+        val toHi = target == "hindi"
+        val toEn = target == "english"
+        if (toHi || target == null) {
             PHRASES.sortedByDescending { it.first.length }.firstOrNull { Regex("\\b" + Regex.escape(it.first) + "\\b").containsMatchIn(p) }?.let { return "'" + it.first + "' ko Hindi mein kehte hain: " + it.second + "." }
         }
-        if (toEn || !toHi) {
+        if (toEn || target == null) {
             PHRASES.sortedByDescending { it.third.length }.firstOrNull { Regex("\\b" + Regex.escape(it.third) + "\\b").containsMatchIn(p) || p.contains(it.second) }?.let { return "'" + p + "' ka matlab hai: " + it.first + "." }
         }
-        return "Ye phrase meri offline phrasebook mein nahi hai. Abhi sirf " + PHRASES.size + " aam phrases hain; poori translation ke liye online mode chahiye."
+        // phrasebook mein nahi: ML Kit (100+ nahi, ~20 languages; model pehli baar download hota hai)
+        return MlTools.translate(p, target ?: if (p.any { it in '\u0900'..'\u097F' }) "english" else "hindi")
     }
 
     // =====================================================================================
