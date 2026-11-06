@@ -34,6 +34,9 @@ class WakeService : Service() {
     // Language fallback: offline Hindi pack na ho to agli language, last mein phone ka default
     private val langs: List<String?> = listOf("hi-IN", "en-IN", "en-US", null)
     private var li = 0
+    private val loopR = Runnable { loop() }
+    /** Ek hi loop chale: naya schedule purane ko hata deta hai (pehle wake ke baad loop mar jata tha, ya do loop mic par ladte the). */
+    private fun schedule(delay: Long) { if (dead) return; h.removeCallbacks(loopR); h.postDelayed(loopR, delay) }
 
     companion object {
         fun start(c: Context) { try { c.startForegroundService(Intent(c, WakeService::class.java)) } catch (_: Exception) {} }
@@ -66,15 +69,15 @@ class WakeService : Service() {
         nm.createNotificationChannel(NotificationChannel("wake", "Divya wake word", NotificationManager.IMPORTANCE_MIN))
         val n = note("\"Wake up Divya\" bolo")
         try { startForeground(77, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) } catch (e: Exception) { stopSelf(); return START_NOT_STICKY }
-        dead = false; h.removeCallbacksAndMessages(null); h.post { loop() }
+        dead = false; h.removeCallbacksAndMessages(null); schedule(0)
         return START_STICKY
     }
 
     private fun loop() {
         if (dead) return
         // Gemini session chal raha ho to mic bilkul free: recognizer band, bas thodi der mein dobara check
-        if (WakeBus.liveActive) { releaseMic(); h.postDelayed({ loop() }, 1500); return }
-        if (!micOk(this) || !SpeechRecognizer.isRecognitionAvailable(this)) { h.postDelayed({ loop() }, 3000); return }
+        if (WakeBus.liveActive) { releaseMic(); schedule(1500); return }
+        if (!micOk(this) || !SpeechRecognizer.isRecognitionAvailable(this)) { schedule(3000); return }
         listen()
     }
 
@@ -93,7 +96,7 @@ class WakeService : Service() {
         releaseMic()
         val my = gen
         val r = makeRecognizer(this); sr = r
-        fun next(delay: Long) { if (!dead && my == gen) h.postDelayed({ loop() }, delay) }
+        fun next(delay: Long) { if (!dead && my == gen) schedule(delay) }
         r.setRecognitionListener(object : RecognitionListener {
             fun check(b: Bundle?): Boolean {
                 if (my != gen || WakeBus.liveActive) return false   // session chal raha hai to wake mat karo
@@ -132,6 +135,7 @@ class WakeService : Service() {
             .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, lang != null)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         if (lang != null) i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+        schedule(25000)   // watchdog: recognizer chup-chap atak jaye (koi callback na aaye) to bhi loop dobara chalega
         try { r.startListening(i) } catch (_: Exception) { next(2000) }
     }
 
@@ -148,7 +152,9 @@ class WakeService : Service() {
         if (!ok) try { startActivity(i) } catch (e: Exception) { Log.w("WakeService", "service launch fail: ${e.message}") }
         // Agar 2.5 sec mein bhi app aage nahi aayi (WakeBus.req abhi true) to notification (full-screen / tap) dikhao
         h.postDelayed({ if (WakeBus.req) showOpenNotification() }, 2500)
-        h.postDelayed({ if (!WakeBus.req) return@postDelayed; WakeBus.liveActive = false; WakeBus.req = false; loop() }, 12000) // agar app khula hi nahi
+        // v2.22.7: wake ke baad loop dobara chalu (session chalte waqt ye bas poll karta hai, session khatam hote hi sunna shuru). Pehle yahan loop mar jata tha -> sirf ek baar sunti thi.
+        schedule(1500)
+        h.postDelayed({ if (!WakeBus.req) return@postDelayed; WakeBus.liveActive = false; WakeBus.req = false; schedule(0) }, 12000) // agar app khula hi nahi
     }
 
     private fun showOpenNotification() {

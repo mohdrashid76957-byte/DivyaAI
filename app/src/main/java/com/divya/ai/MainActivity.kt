@@ -281,7 +281,7 @@ fun DivyaApp(ctx: Context) {
     LaunchedEffect(WakeBus.req) {
         if (!WakeBus.req) return@LaunchedEffect
         WakeBus.req = false
-        if (!live.running && !off.active && micOk(ctx) && (!Net.online(ctx) || prefs.getBoolean("offlineOnly", false))) { off.start(); return@LaunchedEffect }
+        if (!live.running && !off.active && micOk(ctx) && (!Net.online(ctx) || prefs.getBoolean("offlineOnly", false))) { off.start(); WakeBus.liveActive = off.active; return@LaunchedEffect }
         if (!live.running && key().isNotBlank() && micOk(ctx)) {
             live.gfMode = prefs.getBoolean("gf", true); live.callName = prefs.getString("call", "Sir") ?: "Sir"
             live.idleStopMs = 45000

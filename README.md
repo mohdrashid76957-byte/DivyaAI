@@ -354,3 +354,10 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - **Beech mein kat jana:** chup rehne ka wait 0.8 -> 1.2 sec.
 - Typo fix ki list mein naye features ke naam jode (helth, walet, netwrk...).
 - Compile nahi hua; build karke dekho.
+
+## v2.22.7 - Wake word sirf ek baar sunti thi (fix)
+- **Wajah:** "Wake up Divya" sunne ke baad WakeService ka sunne wala loop dobara chalu hi nahi hota tha (sirf tab jab app 12 sec tak khule hi na). Isliye Divya ko off karne ke baad wake word kabhi nahi sunta tha.
+- **Fix:** wake ke turant baad loop dobara schedule hota hai. Session chalte waqt wo sirf poll karta hai (mic free), session band hote hi sunna shuru. Ab ek hi loop chalta hai (purana naya ko nahi todta).
+- **Watchdog:** recognizer chup-chap atak jaye to 25 sec baad loop khud dobara chalta hai.
+- Offline mode shuru na ho paye to wake listener ab ruka nahi rehta.
+- Compile nahi hua; build karke dekho.
