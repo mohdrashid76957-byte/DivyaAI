@@ -256,6 +256,17 @@ object OfflineFeatures {
         return null
     }
 
+    /** Online (Gemini Live) se: phone_brain tool. PIN / vault / eraser yahan band hain, taaki secret cloud model ko na jaye. */
+    fun online(c: Context, command: String): String {
+        val raw = command.trim()
+        if (raw.isBlank()) return "command khali hai"
+        val t = raw.lowercase(Locale.ROOT)
+        if (Regex("\\bpin\\b").containsMatchIn(t) || has(t, "vault", "data erase", "secure erase", "data eraser", "private mode", "intrusion", "वॉल्ट"))
+            return "ye security kaam sirf Offline mode mein hota hai, taaki PIN aur vault ka data cloud model ko na jaye. User ko yehi batao."
+        val nm = c.getSharedPreferences("divya", 0).getString("call", "Sir") ?: "Sir"
+        return handle(c, t, raw, true, nm) ?: "ye command phone features mein nahi mili"
+    }
+
     // =====================================================================================
     // System health
     private fun isRooted(): Boolean {

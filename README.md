@@ -339,3 +339,10 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - **Live wallpaper:** "live wallpaper lagao". Neon chalte particles; simple animation hai, AI nahi.
 
 **Ab bhi NAHI bane:** offline local AI chat model (1-4 GB model), IoT hub, real blockchain wallet, Edge Cloud, Multi-OS layer, multi-language UI, Jarvis-style avatar animation (avatar ki audio-reactive animation pehle se hai).
+
+## v2.22.5 - Online (Gemini Live voice) mein bhi naye features
+- Naya tool `phone_brain(command)`: Gemini Live ab system health, brightness, maths, games, compress, code check, neural network demo, wallet, quantum-safe sign, translate, image analysis, app lock, live wallpaper, offline website/app builder, update check, analytics chala sakti hai. Andar wahi `OfflineFeatures` code chalta hai.
+- **PIN, vault, data eraser, private mode, intrusion log online band hain** (secret cloud model ko na jaaye). Ye sirf Offline mode mein chalte hain.
+- Voice Guardian is tool par bhi lagta hai (Owner only mode mein sirf aapki awaaz).
+- Sirf Live voice mein joda hai. Pro Chat (typed) abhi tools nahi chalata, wahan nahi joda.
+- Compile nahi hua; build karke dekho.
