@@ -402,3 +402,9 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 ## Guardian "Pehle Divya ka mic band karo" bug fix (v2.22.14)
 - Guardian checks ab `MicBus` (asli mic state) par chalte hain, purane `WakeBus.liveActive` flag par nahi.
 - `MicBus` ko Gemini mic, offline mic aur Guardian recording set/reset karte hain.
+
+## Voice match fix (v2.22.16)
+- Test aur gate ab poore bolne ke sliding windows (~0.6 sec each) ka median score lete hain. Pehle sirf aakhri window ya poora 4 sec lete the, jisse apni hi awaaz match nahi hoti thi.
+- Test button ab wahi scoring use karta hai jo gate karta hai (consistent).
+- Threshold ka minimum floor 1.5 (normal bolne ka variation cover karne ke liye).
+- **Zaroori:** purani saved awaaz ka limit purane formula se hai, isliye apni awaaz dobara enroll karo.

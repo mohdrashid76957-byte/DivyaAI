@@ -696,7 +696,7 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
             val pcm = try { VoicePrint.record(4) } catch (e: Exception) { null }
             WakeBus.liveActive = false
             val fr = pcm?.let { VoicePrint.voicedFrames(it) } ?: emptyList()
-            val sc = if (fr.size >= 20) VoicePrint.score(md, VoicePrint.vector(fr)) else -1.0
+            val sc = if (fr.size >= VoicePrint.MIN_VOICED) VoicePrint.matchScore(md, fr) else -1.0
             h.post {
                 vpBusy = false
                 val lim = md.thr * prefs.getFloat("vpSens", 1f)

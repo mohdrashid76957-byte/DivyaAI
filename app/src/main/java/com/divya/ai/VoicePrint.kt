@@ -135,6 +135,19 @@ object VoicePrint {
      * Threshold out-of-sample se: har chunk ko model se bahar rakh kar uska score nikalta hai.
      * Pehle in-sample tha, isliye naye waqt ki owner ki awaaz hamesha limit se upar jaati thi.
      */
+    /**
+     * Poore bolne (chahe 0.6 sec ho ya 4 sec) ka score: har WIN-window ka score nikal kar median.
+     * Pehle sirf aakhri window dekhte the (ya poora 4 sec), jo enrollment se mail nahi khata tha.
+     */
+    fun matchScore(md: VpModel, fr: List<DoubleArray>): Double {
+        if (fr.size <= WIN) return score(md, vector(fr))
+        val s = ArrayList<Double>()
+        var i = 0
+        while (i + WIN <= fr.size) { s.add(score(md, vector(fr.subList(i, i + WIN)))); i += WIN / 2 }
+        s.sort()
+        return s[s.size / 2]
+    }
+
     fun train(c: List<DoubleArray>): VpModel? {
         if (c.size < 8) return null
         val (m, s) = fit(c)
@@ -146,7 +159,8 @@ object VoicePrint {
         }
         loo.sort()
         val p90 = loo[min(loo.size - 1, (loo.size * 0.9).toInt())]
-        return VpModel(m, s, p90 * 1.15 + 0.15)
+        // Floor: normal bolne ka variation enrollment se thoda zyada hota hai, isliye limit kam na ho
+        return VpModel(m, s, max(p90 * 1.25 + 0.2, 1.5))
     }
 
     fun score(md: VpModel, v: DoubleArray): Double {

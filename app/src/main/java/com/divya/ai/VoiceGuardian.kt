@@ -97,12 +97,10 @@ object VoiceGuardian {
         if (people.isEmpty()) return Speaker("unverified", "", 0.0, 0.0, 0)
         val fr = VoicePrint.voicedFrames(pcm)
         if (fr.size < VoicePrint.MIN_VOICED) return Speaker("unverified", "", 0.0, 0.0, 0)
-        // Window ki lambai enrollment jaisi rakho (sirf aakhri WIN frames), warna std ka andaza badal jaata hai
-        val v = VoicePrint.vector(if (fr.size > VoicePrint.WIN) fr.takeLast(VoicePrint.WIN) else fr)
         val sens = p.getFloat("vpSens", 1f)
         var bestRole = "unknown"; var bestName = ""; var bestRatio = Double.MAX_VALUE; var bestSc = 0.0; var bestLim = 1.0
         for ((role, name, md) in people) {
-            val sc = VoicePrint.score(md, v); val lim = md.thr * sens
+            val sc = VoicePrint.matchScore(md, fr); val lim = md.thr * sens
             val ratio = sc / lim
             if (ratio < bestRatio) { bestRatio = ratio; bestRole = role; bestName = name; bestSc = sc; bestLim = lim }
         }
