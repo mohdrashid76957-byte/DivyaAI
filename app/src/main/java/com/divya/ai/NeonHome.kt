@@ -94,7 +94,7 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
         NeonTileData(Icons.Filled.Chat, "Chat with AI", "Ask Anything…", blue, false) { go(Screen.Chat) },
         NeonTileData(Icons.Filled.QrCodeScanner, "Scanner", "Scan QR / Docs", blue, true) { go(Screen.Scan) },
         NeonTileData(Icons.Filled.PhoneAndroid, "Control Mobile", "Open Apps, Settings…", blue, false) { go(Screen.Phone) },
-        NeonTileData(Icons.Filled.Search, "Search Anything", "Web Search…", Color.White, false) { go(Screen.Chat) },
+        NeonTileData(Icons.Filled.Apps, "Kali Launcher", "Apps, Theme, Wallpaper", Color.White, false) { go(Screen.Apps) },
         NeonTileData(Icons.Filled.SmartToy, "AI Tools", "Image, Code, More…", blue, false) { go(Screen.Automate) },
         NeonTileData(Icons.Filled.GraphicEq, "Voice Changer", "Change Your Voice…", NeonPurple, false) { go(Screen.Settings) },
         NeonTileData(Icons.Filled.Star, "Smart Features", "Explore More…", Color(0xFFFFC107), false) { go(Screen.Settings) },
@@ -197,6 +197,7 @@ fun AboutScreen(th: UiTheme) {
             .border(1.dp, th.accent.copy(alpha = 0.6f), RoundedCornerShape(16.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("🆕 Latest Update — v$ver", color = th.accent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             listOf(
+                "🐉 Home par naya \"Kali Launcher\" tile + Tools mein button: yahin se Kali theme/wallpaper on karo",
                 "🐉 Kali Linux theme + Divya Kali wallpaper",
                 "🚀 Divya Kali Launcher: neon hex icons, categories, search",
                 "🖼 Apps screen se ek tap mein Kali wallpaper (home + lock)",

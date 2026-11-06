@@ -422,3 +422,6 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 ## v2.22.19
 - Kali theme + wallpaper ab Apps screen khulte hi khud lagte hain (ek baar); wallpaper Apps screen ke peeche hamesha dikhta hai
 - Naya "📲 Wallpaper (manual)" button: auto set na ho to phone ka Set-wallpaper chooser khulta hai
+
+## v2.22.20
+- BUG FIX: neon theme mein Apps screen (Kali Launcher, theme, wallpaper chips) tak koi button hi nahi tha. Ab Home par "Kali Launcher" tile aur Tools screen mein "Kali Apps Launcher" button hai.

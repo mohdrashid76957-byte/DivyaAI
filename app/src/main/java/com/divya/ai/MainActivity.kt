@@ -346,7 +346,7 @@ fun DivyaApp(ctx: Context) {
                 Screen.Journal -> JournalScreen(th, prefs)
                 Screen.Study -> StudyScreen(th)
                 Screen.Apps -> AppsScreen(th, ctx, prefs, { themeIdx = it; prefs.edit().putInt("theme2", it).apply() })
-                Screen.Quick -> QuickScreen(th, ctx, { screen = Screen.Scan }) { screen = Screen.Code }
+                Screen.Quick -> QuickScreen(th, ctx, { screen = Screen.Scan }, { screen = Screen.Apps }) { screen = Screen.Code }
                 Screen.Code -> CodeScreen(th, ctx) { CodeBus.previewProject = it; CodeBus.previewTick++; screen = Screen.Preview }
                 Screen.Preview -> PreviewScreen(th, ctx, CodeBus.previewProject ?: "", CodeBus.previewTick) { screen = Screen.Code }
                 Screen.Scan -> ScanScreen(th, live, live.running, status, { if (!live.running) tapMic() }, { t -> sendChat(t) }) { screen = Screen.Home }
@@ -517,7 +517,8 @@ fun ChatScreen(th: UiTheme, msgs: List<Pair<String, String>>, online: Boolean, s
 }
 
 @Composable
-fun QuickScreen(th: UiTheme, ctx: Context, openScan: () -> Unit = {}, openCode: () -> Unit = {}) = Page(th, "Quick Actions") {
+fun QuickScreen(th: UiTheme, ctx: Context, openScan: () -> Unit = {}, openApps: () -> Unit = {}, openCode: () -> Unit = {}) = Page(th, "Quick Actions") {
+    Btn(th, "🐉 Kali Apps Launcher + Theme + Wallpaper") { openApps() }
     Btn(th, "💻 Code & Website Builder") { openCode() }
     Btn(th, "📷 Scanner (Divya ko dikhao)") { openScan() }
     listOf("Home" to "home", "Back" to "back", "Recent Apps" to "recents", "Notifications" to "notifications",
