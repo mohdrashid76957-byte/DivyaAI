@@ -124,7 +124,7 @@ class OfflineBrain(
         try { sr?.cancel(); sr?.destroy() } catch (_: Exception) {}
         sr = null
         try { tts?.stop() } catch (_: Exception) {}
-        speaking = false; doneCb = null; pending = null
+        speaking = false; doneCb = null; pending = null; OfflineFeatures.reset()
         active = false
         WakeBus.liveActive = false
         onStatus(msg)
@@ -474,6 +474,10 @@ class OfflineBrain(
         // --- band karo ---
         if (SessionControl.isStop(t) || t == "stop" || t == "bas" || t == "बस" || t == "bye" || t == "बाय" ||
             has(t, "offline band", "sunna band", "सुनना बंद", "alvida", "अलविदा", "goodbye", "good bye")) return null
+
+        // --- v2.22.3: naye offline features (system health, maths, games, PIN/vault, builders...) ---
+        OfflineFeatures.count(ctx)
+        OfflineFeatures.handle(ctx, t, raw, typed, name())?.let { return it }
 
         // --- baat-cheet ---
         if (t == "hi" || has(t, "hello", "namaste", "नमस्ते", "हेलो")) return "Namaste ${name()}! Boliye, kya karna hai?"
