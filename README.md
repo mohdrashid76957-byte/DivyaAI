@@ -425,3 +425,6 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 
 ## v2.22.20
 - BUG FIX: neon theme mein Apps screen (Kali Launcher, theme, wallpaper chips) tak koi button hi nahi tha. Ab Home par "Kali Launcher" tile aur Tools screen mein "Kali Apps Launcher" button hai.
+
+## v2.22.21
+- Ice theme Home par bhi "Kali Launcher" tile (Search Anything ki jagah, NEW badge). Upar-left wale menu circle se bhi Apps screen khulti hai.

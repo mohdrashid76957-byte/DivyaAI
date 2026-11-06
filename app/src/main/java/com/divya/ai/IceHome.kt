@@ -78,7 +78,7 @@ fun IceHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic:
 
     val leftTiles = listOf(
         IceTileData(Icons.Filled.Chat, "Chat with AI", blue, false) { go(Screen.Chat) },
-        IceTileData(Icons.Filled.Search, "Search Anything", Color.White, false) { go(Screen.Chat) },
+        IceTileData(Icons.Filled.Apps, "Kali Launcher", Color.White, true) { go(Screen.Apps) },
         IceTileData(Icons.Filled.Star, "Smart Features", Color(0xFFFFC107), false) { go(Screen.Settings) }
     )
     val rightTiles = listOf(
