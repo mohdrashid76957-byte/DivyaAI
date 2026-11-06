@@ -239,6 +239,7 @@ fun DivyaApp(ctx: Context) {
         })
     }
     val off = remember { OfflineBrain(ctx, { st -> status = st }, { w, t -> msgs.add(w to t) }) }
+    SideEffect { com.divya.ai.glow.HudOverlay.onTap = { if (off.active) off.stop() else if (live.running) live.stop() } }   // ring par tap = Divya band
     val th = themes[themeIdx]
     val lightBars = th.name == "Lavender Light"
     SideEffect {
@@ -305,8 +306,7 @@ fun DivyaApp(ctx: Context) {
     val micNow = live.micOn || off.active
     val runningNow = live.running
     LaunchedEffect(status, micNow, runningNow, glowOn) {
-        val svc = DivyaService.instance ?: return@LaunchedEffect
-        if (!glowOn) { GlowOverlay.hide(); return@LaunchedEffect }
+        val svc: android.content.Context = DivyaService.instance ?: ctx   // v2.22.8: accessibility ke bina bhi (overlay permission se)
         when {
             micNow -> GlowOverlay.show(svc, GlowState.LISTENING)
             runningNow -> GlowOverlay.show(svc, GlowState.SPEAKING)
@@ -601,6 +601,17 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
         Text("Glow light (screen ke kinare ki rangeen light)", color = th.text, modifier = Modifier.weight(1f))
         Switch(gl, { gl = it; prefs.edit().putBoolean("glow", it).apply() })
     }
+    var hd by remember { mutableStateOf(prefs.getBoolean("hud", true)) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Jarvis ring (Divya se baat karte waqt screen par ghoomta gola)", color = th.text, modifier = Modifier.weight(1f))
+        Switch(hd, { hd = it; prefs.edit().putBoolean("hud", it).apply(); if (!it) com.divya.ai.glow.HudOverlay.hide() })
+    }
+    var hdd by remember { mutableStateOf(prefs.getBoolean("hudDim", true)) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Ring ke peeche andhera (full screen, ring par tap = Divya band). Band karo to peeche ka app dikhega", color = th.text, modifier = Modifier.weight(1f))
+        Switch(hdd, { hdd = it; prefs.edit().putBoolean("hudDim", it).apply(); com.divya.ai.glow.HudOverlay.hide() })
+    }
+    Text("Ring ke liye Accessibility ya 'Display over other apps' permission ON honi chahiye.", color = th.text.copy(alpha = 0.6f), fontSize = 11.sp)
     var fl by remember { mutableStateOf(prefs.getBoolean("float", false)) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("Floating Divya (home/apps ke upar avatar)", color = th.text, modifier = Modifier.weight(1f))

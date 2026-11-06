@@ -25,7 +25,11 @@ object GlowOverlay {
     private var wm: WindowManager? = null
 
     fun show(context: Context, state: GlowState = GlowState.IDLE) {
-        if (view != null) { setState(state); return }
+        val pf = context.getSharedPreferences("divya", 0)
+        // v2.22.8: Jarvis ring HUD (apni setting "hud"), glow border ki alag setting "glow"
+        if (pf.getBoolean("hud", true)) HudOverlay.show(context, state) else HudOverlay.hide()
+        if (!pf.getBoolean("glow", true)) { hideGlow(); return }
+        if (view != null) { view?.state = state; return }
         val isA11y = context is android.accessibilityservice.AccessibilityService
         if (!isA11y && !Settings.canDrawOverlays(context)) return
         val type = if (isA11y && Build.VERSION.SDK_INT >= 22)
@@ -55,9 +59,11 @@ object GlowOverlay {
         wm = manager; view = v
     }
 
-    fun setState(state: GlowState) { view?.state = state }
+    fun setState(state: GlowState) { view?.state = state; HudOverlay.setState(state) }
 
-    fun hide() {
+    fun hide() { HudOverlay.hide(); hideGlow() }
+
+    private fun hideGlow() {
         view?.let { runCatching { wm?.removeView(it) } }
         view = null; wm = null
     }

@@ -82,7 +82,7 @@ object OfflineFeatures {
         if (has(t, "offline features", "offline feature", "features list", "kya kya features", "फीचर"))
             return "Offline mein ye sab chalta hai: system health, root check, brightness, maths solver, games, PIN lock, private mode, vault, " +
                 "intrusion log, data eraser, file compress, code debugger, neural network trainer, website / app / photo editor / 3D viewer builder, " +
-                "local wallet ledger, quantum-safe signature, Hindi-English translator, update manager aur analytics. Kisi ka naam bolo."
+                "local wallet ledger, quantum-safe signature, Hindi-English translator, update manager, wallpaper badlo aur analytics. Kisi ka naam bolo."
 
         if (has(t, "analytics", "usage stats", "kitne command", "edge ai")) {
             return try {
@@ -103,6 +103,8 @@ object OfflineFeatures {
             prefs(c).edit().putBoolean("appLock", !off).apply()
             return if (off) "App lock band." else "App lock ON. Ab app kholne par phone ka PIN, fingerprint ya face poochha jayega."
         }
+        // v2.22.8: wallpaper badlo (voice se) - "live"/"neon" bole to purana animated wallpaper preview
+        if (has(t, "wallpaper", "वॉलपेपर", "wall paper") && !has(t, "live", "लाइव", "neon", "preview")) { bump(c, "wallpaper"); return Wallpapers.handle(c, t) }
         if (has(t, "live wallpaper", "wallpaper lagao", "neon wallpaper")) {
             bump(c, "wallpaper")
             startAct(c, Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)

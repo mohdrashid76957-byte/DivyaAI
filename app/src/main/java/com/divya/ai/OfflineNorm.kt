@@ -145,7 +145,7 @@ object OfflineNorm {
         "quantum sign verify translate analytics face fingerprint wallpaper live image analysis scan features offline " +
         "battery torch flashlight volume awaz call message sms whatsapp instagram youtube open kholo khol band chalu bajao batao bata sunao " +
         "alarm timer yaad remind note notification screenshot settings wifi bluetooth music gaana time date baje tareekh plus minus guna bhag percent " +
-        "joke paheli hisab kitna kitni badha kam silent vibrate weather"
+        "joke paheli hisab kitna kitni badha kam silent vibrate weather wallpaper badlo lagao random"
     ).split(" ")
 
     /** Is sentence mein kitne known command-shabd hain (galat sune hue option ko pehchanne ke liye). */

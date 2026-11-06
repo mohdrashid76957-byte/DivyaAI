@@ -361,3 +361,12 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - **Watchdog:** recognizer chup-chap atak jaye to 25 sec baad loop khud dobara chalta hai.
 - Offline mode shuru na ho paye to wake listener ab ruka nahi rehta.
 - Compile nahi hua; build karke dekho.
+
+## v2.22.8 - Jarvis jaisa ghoomta gola (ring HUD) + voice se wallpaper badalna
+- **Ring HUD (video jaisa):** Divya se baat karte waqt screen ke beech mein neon-neela gola ghoomta hai (moti segmented ring, patli dashes, chamakdar arcs) aur beech mein "DIVYA" likha. Sab apps ke upar dikhta hai (home screen par bhi). Rings alag-alag speed aur direction mein ghoomte hain, Divya ki awaaz ke saath dhadakte hain; sunte waqt cyan, bolte waqt zyada tez, kaam karte waqt (tool chalte) ring chhota hoke upar chala jata hai aur andhera hat jata hai taaki kaam dikhe.
+- Settings mein 2 switch: **Jarvis ring** (ON/OFF) aur **Ring ke peeche andhera** (ON = full screen andhera, ring par tap karo = Divya band; OFF = sirf ring, touch peeche ke app ko jaata hai).
+- Ring ke liye Accessibility ya "Display over other apps" permission chahiye (Accessibility ON ho to koi extra permission nahi). Glow border ki apni alag setting rehti hai.
+- Online (Gemini Live) aur Offline mode dono mein chalta hai.
+- **Wallpaper badalna:** "wallpaper badlo", "green wallpaper lagao", "lock screen wallpaper red", "random wallpaper", "wallpaper styles batao". 7 neon styles phone par hi bante hain (reactor neela, matrix hara, crimson laal, violet jamuni, gold sunehra, aurora, amoled kala). Offline voice, typed chat aur Gemini Live (phone_brain) teeno se. Naya permission SET_WALLPAPER (normal permission, popup nahi aata). "live wallpaper" bologe to purana animated wallpaper preview khulta hai.
+- **Dhyan:** ye video ka exact copy nahi hai, uske jaisa design hai (video ki artwork/Iron Man wali picture nahi li). Wallpaper mein armor ki photo nahi, neon rings hain.
+- Compile aur phone par test nahi hua; build karke dekho. Ring ki speed / size `glow/HudOverlay.kt` mein `rings` list se badal sakte ho.
