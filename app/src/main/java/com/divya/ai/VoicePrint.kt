@@ -16,6 +16,10 @@ object VoicePrint {
     private const val NFFT = 512
     private const val NMEL = 26
     private const val NCEP = 14          // c0..c13, c0 chhod dete hain -> 13 coeff
+    /** Ek match window = 60 bolne wale frames (~0.6 sec). Enrollment aur gate dono isi lambai par compare karte hain. */
+    const val WIN = 60
+    /** Itne bolne wale frames se kam ho to awaaz pakki nahi hoti. */
+    const val MIN_VOICED = 30
 
     private val window = DoubleArray(FRAME) { 0.54 - 0.46 * cos(2 * PI * it / (FRAME - 1)) }
     private val melBank: Array<DoubleArray> = buildMel()
@@ -94,7 +98,8 @@ object VoicePrint {
         val sorted = energies.sortedArray()
         val ref = sorted[min(sorted.size - 1, (sorted.size * 0.9).toInt())]
         val out = ArrayList<DoubleArray>()
-        for (f in 0 until cnt) if (energies[f] > ref * 0.1 && energies[f] > 3000.0) out.add(feats[f])
+        // Relative threshold (mic gain ke hisaab se badalta nahi). Absolute floor bahut kam, sirf khamoshi hatane ke liye.
+        for (f in 0 until cnt) if (energies[f] > ref * 0.05 && energies[f] > 200.0) out.add(feats[f])
         return out
     }
 
@@ -110,23 +115,38 @@ object VoicePrint {
         return v
     }
 
-    /** Enrollment audio ko ~1 sec (bolne wale) ke tukdon mein todo. */
+    /** Enrollment audio ko WIN-frame (~0.6 sec) ke overlapping tukdon mein todo, gate wali lambai jaisa. */
     fun chunks(pcm: ShortArray): List<DoubleArray> {
         val fr = voicedFrames(pcm)
         val out = ArrayList<DoubleArray>()
         var i = 0
-        while (i + 40 <= fr.size) { out.add(vector(fr.subList(i, min(fr.size, i + 80)))); i += 60 }
+        while (i + WIN <= fr.size) { out.add(vector(fr.subList(i, i + WIN))); i += WIN / 2 }
         return out
     }
 
-    fun train(c: List<DoubleArray>): VpModel? {
-        if (c.size < 4) return null
+    private fun fit(c: List<DoubleArray>): Pair<DoubleArray, DoubleArray> {
         val d = c[0].size
         val m = DoubleArray(d) { j -> c.sumOf { it[j] } / c.size }
         val s = DoubleArray(d) { j -> max(sqrt(c.sumOf { (it[j] - m[j]) * (it[j] - m[j]) } / c.size), 0.05 * abs(m[j]) + 0.3) }
-        val tmp = VpModel(m, s, 0.0)
-        val worst = c.maxOf { score(tmp, it) }
-        return VpModel(m, s, worst * 1.6 + 0.4)
+        return Pair(m, s)
+    }
+
+    /**
+     * Threshold out-of-sample se: har chunk ko model se bahar rakh kar uska score nikalta hai.
+     * Pehle in-sample tha, isliye naye waqt ki owner ki awaaz hamesha limit se upar jaati thi.
+     */
+    fun train(c: List<DoubleArray>): VpModel? {
+        if (c.size < 8) return null
+        val (m, s) = fit(c)
+        val loo = ArrayList<Double>()
+        for (i in c.indices) {
+            val rest = c.filterIndexed { j, _ -> j != i }
+            val (mi, si) = fit(rest)
+            loo.add(score(VpModel(mi, si, 0.0), c[i]))
+        }
+        loo.sort()
+        val p90 = loo[min(loo.size - 1, (loo.size * 0.9).toInt())]
+        return VpModel(m, s, p90 * 1.15 + 0.15)
     }
 
     fun score(md: VpModel, v: DoubleArray): Double {

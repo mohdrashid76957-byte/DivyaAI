@@ -611,15 +611,6 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
         Text("Orb ke peeche halka andhera (orb chhota rehta hai, touch/Back neeche ke app ko hi jaata hai)", color = th.text, modifier = Modifier.weight(1f))
         Switch(hdd, { hdd = it; prefs.edit().putBoolean("hudDim", it).apply(); com.divya.ai.glow.HudOverlay.hide() })
     }
-    var orbSt by remember { mutableStateOf(prefs.getString("orbStyle", "classic") ?: "classic") }
-    Text("Orb style (agle session se lagta hai)", color = th.text, fontSize = 13.sp)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("classic" to "Classic", "4dzine" to "4DZINE").forEach { (key, label) ->
-            FilterChip(orbSt == key, {
-                orbSt = key; prefs.edit().putString("orbStyle", key).apply(); com.divya.ai.glow.HudOverlay.hide()
-            }, { Text(label, fontSize = 11.sp) })
-        }
-    }
     Text("Ring ke liye Accessibility ya 'Display over other apps' permission ON honi chahiye.", color = th.text.copy(alpha = 0.6f), fontSize = 11.sp)
     var fl by remember { mutableStateOf(prefs.getBoolean("float", false)) }
     Row(verticalAlignment = Alignment.CenterVertically) {

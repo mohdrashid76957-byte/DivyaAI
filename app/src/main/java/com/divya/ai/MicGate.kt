@@ -70,7 +70,8 @@ class MicGate(private val ctx: Context) {
             St.HOLD -> {
                 held.add(chunk)
                 if (speech) { voiced++; sil = 0 } else sil++
-                val ended = sil >= 4                       // 200ms chup = chhoti baat khatam
+                // 200ms chup = baat khatam, lekin sirf jab itna bola ja chuka ho ki awaaz pakki ho sake
+                val ended = sil >= 4 && voiced >= VoicePrint.MIN_VOICED / 3
                 if (voiced >= DECIDE_VOICED || held.size >= MAX_HOLD + PRE || ended) decide(out) { send(it) }
             }
             St.PASS -> {
@@ -92,6 +93,7 @@ class MicGate(private val ctx: Context) {
         val p = ctx.getSharedPreferences("divya", 0)
         val sp = VoiceGuardian.identifyRaw(p, pcm)
         VoiceGuardian.last = sp
+        android.util.Log.i("DivyaGuard", "role=${sp.role} name=${sp.name} score=${"%.2f".format(sp.score)} limit=${"%.2f".format(sp.limit)} conf=${sp.conf}")
         val mode = p.getInt("vgMode", 1)
         // "unverified" = bahut chhoti awaaz (verify nahi ho sakti): owner-only mein pass nahi karte
         val ok = when (sp.role) { "owner" -> true; "family" -> mode == 2; else -> false }
