@@ -156,7 +156,7 @@ class OfflineBrain(
         val t = tts
         if (t == null || !ttsReady) { h.postDelayed({ if (after != null) after() else listen() }, 300); return }
         speaking = true
-        doneCb = { if (after != null) after() else listen() }
+        doneCb = { if (after != null) after() else h.postDelayed({ listen() }, 500) }
         onStatus("Divya bol rahi hai…")
         val my = ++uid
         t.speak(text, TextToSpeech.QUEUE_FLUSH, null, "d$my")
@@ -220,7 +220,8 @@ class OfflineBrain(
         r.setRecognitionListener(object : RecognitionListener {
             override fun onResults(b: Bundle?) {
                 if (!active || my != lsn) return
-                val s = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
+                val alts = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+                val s = if (alts.isEmpty()) "" else OfflineNorm.pick(alts)
                 if (s.isEmpty()) { onStatus("Suna nahi, dobara boliye"); h.postDelayed({ listen() }, 200); return }
                 errs = 0; noMatch = 0; lastHeard = now()
                 p.edit().putInt("offLangIdx", langIdx).putInt("offMode", mode).apply()
@@ -274,10 +275,10 @@ class OfflineBrain(
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, langs[langIdx])
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             // Bolna khatam hone ke baad jaldi jawab (default lamba tha)
-            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 800L)
-            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
         onStatus("Offline: shuru ho rahi hoon… (${langs[langIdx]} • $modeName)")
         try { r.startListening(i) } catch (_: Exception) { h.postDelayed({ listen() }, 1000) }
         // watchdog: 4 sec mein recognizer ready na ho to agle mode par
@@ -444,7 +445,7 @@ class OfflineBrain(
 
     /** Return: jawab (bolne ke liye). null = offline mode band karo. Ek hi line mein kai kaam ("torch chalu karo phir volume badhao") chain mein chalte hain. */
     private fun exec(raw: String, typed: Boolean = false): String? {
-        val fixed = OfflineSmart.fixTypos(raw)
+        val fixed = OfflineSmart.fixTypos(OfflineNorm.loan(raw))
         val parts = CHAIN.split(fixed.trim()).filter { it.isNotBlank() }
         if (parts.size in 2..4 && pending == null) {
             val outs = ArrayList<String>()
@@ -454,7 +455,19 @@ class OfflineBrain(
         return execOne(fixed, typed)
     }
 
+    private val NOT_UNDERSTOOD = "Ye mujhe samajh nahi aaya"
+
+    /** Pehle Devanagari ke saath, samajh na aaye to poora Roman Hinglish bana kar dobara (side-effect sirf tab jab command mile). */
     private fun execOne(raw: String, typed: Boolean): String? {
+        val r = execCore(raw, typed)
+        if (r != null && r.startsWith(NOT_UNDERSTOOD) && OfflineNorm.hasDevanagari(raw)) {
+            val b = OfflineSmart.fixTypos(OfflineNorm.roman(raw))
+            if (b != raw) return execCore(b, typed)
+        }
+        return r
+    }
+
+    private fun execCore(raw: String, typed: Boolean): String? {
         val t = raw.lowercase(Locale.ROOT).trim()
         val svc = DivyaService.instance
         val voiceLock = !typed && p.getBoolean("voiceLock", false) && p.getInt("vgMode", 1) >= 1
@@ -711,7 +724,7 @@ class OfflineBrain(
         }
 
         OfflineSmart.answer(ctx, t, name())?.let { return it }
-        return "Ye mujhe samajh nahi aaya. Poochho: 'kya kar sakti ho' to main batati hoon."
+        return NOT_UNDERSTOOD + ". Poochho: 'kya kar sakti ho' to main batati hoon."
     }
 
     private fun sendSms(who: String, body: String): String {

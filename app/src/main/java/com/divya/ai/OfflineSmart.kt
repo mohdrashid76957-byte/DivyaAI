@@ -24,7 +24,9 @@ object OfflineSmart {
         "battery", "volume", "torch", "flashlight", "alarm", "timer", "whatsapp", "instagram", "youtube", "bluetooth",
         "screenshot", "notification", "notifications", "calculator", "message", "settings", "reminder", "remind",
         "weather", "recents", "brightness", "airplane", "storage", "camera", "gallery", "contacts", "calendar",
-        "silent", "vibrate", "music", "previous", "multiply", "divide", "percent", "temperature", "charging"
+        "silent", "vibrate", "music", "previous", "multiply", "divide", "percent", "temperature", "charging",
+        "system", "health", "wallet", "vault", "neural", "network", "translate", "calculate", "compress", "analytics", "wallpaper",
+        "website", "games", "riddle", "update", "version", "status", "monitor", "builder", "editor", "ledger", "quantum"
     )
 
     private fun lev(a: String, b: String): Int {

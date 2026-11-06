@@ -346,3 +346,11 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - Voice Guardian is tool par bhi lagta hai (Owner only mode mein sirf aapki awaaz).
 - Sirf Live voice mein joda hai. Pro Chat (typed) abhi tools nahi chalata, wahan nahi joda.
 - Compile nahi hua; build karke dekho.
+
+## v2.22.6 - Offline: galat sunna + naye features na chalna fix
+- **Asli wajah:** Hindi (hi-IN) recognizer English shabd Devanagari mein likhta hai ("सिस्टम हेल्थ"), par naye features ke keywords Roman mein the, isliye match nahi hota tha. Naya `OfflineNorm.kt`: Devanagari ke English shabd -> English ("system health"), ank -> 0-9, aur samajh na aaye to poora Roman Hinglish bana kar dobara try.
+- **Galat sunna:** pehle recognizer ka sirf pehla option liya jata tha. Ab 5 options mein se wo chunta hai jisme sabse zyada command-shabd hon. Chat mein jo sunaa wo dikhta hai (🎤 line), galat aaye to wahi batana.
+- **Divya ki apni awaaz mic mein aa jati thi:** bolne ke baad 0.5 sec ruk kar sunti hai.
+- **Beech mein kat jana:** chup rehne ka wait 0.8 -> 1.2 sec.
+- Typo fix ki list mein naye features ke naam jode (helth, walet, netwrk...).
+- Compile nahi hua; build karke dekho.
