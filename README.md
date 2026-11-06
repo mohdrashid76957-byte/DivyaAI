@@ -382,3 +382,12 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - **Wallpaper badalna:** "wallpaper badlo", "green wallpaper lagao", "lock screen wallpaper red", "random wallpaper", "wallpaper styles batao". 7 neon styles phone par hi bante hain (reactor neela, matrix hara, crimson laal, violet jamuni, gold sunehra, aurora, amoled kala). Offline voice, typed chat aur Gemini Live (phone_brain) teeno se. Naya permission SET_WALLPAPER (normal permission, popup nahi aata). "live wallpaper" bologe to purana animated wallpaper preview khulta hai.
 - **Dhyan:** ye video ka exact copy nahi hai, uske jaisa design hai (video ki artwork/Iron Man wali picture nahi li). Wallpaper mein armor ki photo nahi, neon rings hain.
 - Compile aur phone par test nahi hua; build karke dekho. Ring ki speed / size `glow/HudOverlay.kt` mein `rings` list se badal sakte ho.
+
+## Orb style: Classic / 4DZINE
+- Settings > Voice orb ke neeche **Orb style** chips: `Classic` (purana gola) ya `4DZINE` (chaukor/tesseract style, quadrant arcs ghoomte hue).
+- Chip badalne par orb agle session se naye style mein dikhta hai. Default Classic hai.
+- Pref key: `orbStyle` (prefs "divya"). Code: `glow/HudOverlay.kt` (`draw4dzine`), `MainActivity.kt` (settings chips).
+
+## Orb rotation (video jaisa)
+- Voice orb ka kaanton wala ghera ab lagataar ghoomta hai (bahar ek disha mein, andar ulta), awaaz/thinking ke saath tez hota hai.
+- Code: `glow/HudOverlay.kt` (`jag(... rot)`), 4DZINE mein bhi quadrant arcs ghoomte hain.
