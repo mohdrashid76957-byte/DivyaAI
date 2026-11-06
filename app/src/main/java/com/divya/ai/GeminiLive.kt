@@ -273,9 +273,9 @@ class GeminiLive(
                     }
                 }
                 sc.optJSONObject("outputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let {
-                    val n = newTurn; newTurn = false; main.post { onText(it, n) }
+                    val n = newTurn; newTurn = false; AvatarBus.say(if (n) it else AvatarBus.caption + it); main.post { onText(it, n) }
                 }
-                sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let { AvatarBus.moveTo(2); main.post { onHeard(it) }; heard.append(it).append(' '); if (SessionControl.isStop(heard.toString().takeLast(60))) requestEnd() }
+                sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let { AvatarBus.moveTo(2); main.post { onHeard(it) }; heard.append(it).append(' '); AvatarBus.say(heard.toString().trim()); if (SessionControl.isStop(heard.toString().takeLast(60))) requestEnd() }
                 if (sc.optBoolean("turnComplete")) {
                     newTurn = true; heard.setLength(0)
                     if (endAfter) main.postDelayed({ stop() }, 1800)   // alvida poora bolne do, phir band
@@ -569,6 +569,7 @@ class GeminiLive(
                     val n = r.read(buf, 0, buf.size)
                     if (n < 0) { state("Mic error $n"); break }
                     if (n == 0) continue
+                    AvatarBus.micLevel = AvatarBus.pcmLevel(buf, n)
                     val now = android.os.SystemClock.uptimeMillis()
                     if (now - gateChk > 1000) {
                         gateChk = now
@@ -607,7 +608,7 @@ class GeminiLive(
         playQ.clear(); try { playThread?.interrupt() } catch (_: Exception) {}; playThread = null
         synchronized(trackLock) { try { track?.stop() } catch (_: Exception) {}; try { track?.release() } catch (_: Exception) {}; track = null }
         rec = null; ws = null
-        AvatarBus.moveTo(0); AvatarBus.level = 0f; AvatarBus.speaking = false
+        AvatarBus.moveTo(0); AvatarBus.level = 0f; AvatarBus.speaking = false; AvatarBus.micLevel = 0f; AvatarBus.say("")
         updateGlow()
         LiveKeepService.stop(ctx)
         state(msg)

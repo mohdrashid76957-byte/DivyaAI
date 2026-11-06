@@ -362,6 +362,18 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - Offline mode shuru na ho paye to wake listener ab ruka nahi rehta.
 - Compile nahi hua; build karke dekho.
 
+## v2.22.10 - Voice orb (video wala naachta gola) + live caption
+- Bada Jarvis ring hata diya. Ab screen ke neeche-beech (dock ke upar) chhota orb: shant mein chhota gola + chamakta dot, awaaz ke saath bada hota hai, kinara kaante jaisa naachta hai, bahar ripple rings nikalti hain.
+- Meri mic ki awaaz aur Divya ki awaaz, dono se orb react karta hai (AvatarBus.micLevel + level).
+- Orb ke neeche live caption pill: "LISTENING...", jo suna/bola ja raha hai (online aur offline dono), kaam ke waqt "WORKING...". THINKING mein violet rang + ghoomte arcs.
+- Touch pass-through, Back/Home par Divya band nahi hoti (v2.22.9 ka fix barkarar).
+
+## v2.22.9 - Jarvis ring fix (chhota, beech mein, touch pass-through) + Back/Home par Divya band nahi hoti
+- Ring ab reference video jaisa: mota chamakta segmented neon band + patle dashed rings + beech mein "DIVYA", phone ke BEECH mein chhota (screen ka ~80%), poori screen dim nahi.
+- Ring touch bilkul nahi leta: pehle ring par kisi bhi touch/swipe (Back gesture/button samet) se Divya band ho jaati thi - ab nahi.
+- Back dabane par agar Divya (online ya offline) chal rahi hai to app background mein jaata hai, session zinda rehta hai.
+- Manifest mein configChanges: rotate/dark-mode/font change par activity dobara nahi banti, isliye session/ring beech mein gayab nahi hote.
+
 ## v2.22.8 - Jarvis jaisa ghoomta gola (ring HUD) + voice se wallpaper badalna
 - **Ring HUD (video jaisa):** Divya se baat karte waqt screen ke beech mein neon-neela gola ghoomta hai (moti segmented ring, patli dashes, chamakdar arcs) aur beech mein "DIVYA" likha. Sab apps ke upar dikhta hai (home screen par bhi). Rings alag-alag speed aur direction mein ghoomte hain, Divya ki awaaz ke saath dhadakte hain; sunte waqt cyan, bolte waqt zyada tez, kaam karte waqt (tool chalte) ring chhota hoke upar chala jata hai aur andhera hat jata hai taaki kaam dikhe.
 - Settings mein 2 switch: **Jarvis ring** (ON/OFF) aur **Ring ke peeche andhera** (ON = full screen andhera, ring par tap karo = Divya band; OFF = sirf ring, touch peeche ke app ko jaata hai).

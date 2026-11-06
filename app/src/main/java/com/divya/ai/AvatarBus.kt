@@ -15,12 +15,19 @@ object AvatarBus {
     var shape by mutableStateOf(0f)         // 0 = gol/khula (aa, oo), 1 = chaudha/patla (ee, s, sh) - awaaz ke zero-crossing se andaza
     var speaking by mutableStateOf(false)   // Divya abhi bol rahi hai (chhote pauses mein bhi true rehta hai)
 
+    // v2.22.10: HUD orb ke liye (compose state nahi, sirf draw loop padhta hai)
+    @Volatile var micLevel = 0f      // meri (user ki) awaaz ki loudness 0..1, mic chalte waqt
+    @Volatile var caption = ""       // jo abhi suna/bola ja raha hai (orb ke neeche pill mein dikhta hai)
+    @Volatile var captionAt = 0L
+    fun say(t: String) { caption = t; captionAt = android.os.SystemClock.uptimeMillis() }
+
     fun moveTo(s: Int) { if (stage != s) stage = s }
 
     /** 16-bit PCM chunk ki loudness (RMS) 0..1. Har 4th sample le kar tez rakha hai. */
-    fun pcmLevel(b: ByteArray): Float {
+    fun pcmLevel(b: ByteArray, len: Int = b.size): Float {
         var sum = 0.0; var n = 0; var i = 0
-        while (i + 1 < b.size) {
+        val end = minOf(len, b.size)
+        while (i + 1 < end) {
             val v = (b[i + 1].toInt() shl 8) or (b[i].toInt() and 0xFF)
             sum += v.toDouble() * v; n++; i += 8
         }

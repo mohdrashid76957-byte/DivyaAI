@@ -238,8 +238,8 @@ fun DivyaApp(ctx: Context) {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) } catch (_: Exception) {}
         })
     }
-    val off = remember { OfflineBrain(ctx, { st -> status = st }, { w, t -> msgs.add(w to t) }) }
-    SideEffect { com.divya.ai.glow.HudOverlay.onTap = { if (off.active) off.stop() else if (live.running) live.stop() } }   // ring par tap = Divya band
+    val off = remember { OfflineBrain(ctx, { st -> status = st }, { w, t -> msgs.add(w to t); AvatarBus.say(t) }) }
+    SideEffect { com.divya.ai.glow.HudOverlay.onTap = null }   // v2.22.9: ring ab touch nahi leta, tap se Divya band nahi hoti
     val th = themes[themeIdx]
     val lightBars = th.name == "Lavender Light"
     SideEffect {
@@ -294,7 +294,7 @@ fun DivyaApp(ctx: Context) {
     // Home par Back dabane par agar Divya chal rahi hai to app band mat karo, background mein bhej do (session + glow chalte rahein)
     BackHandler(screen == Screen.Home) {
         val act = ctx as? android.app.Activity
-        if (live.running) act?.moveTaskToBack(true) else act?.finish()
+        if (live.running || off.active) act?.moveTaskToBack(true) else act?.finish()
     }
     // App sach mein band ho (swipe/finish) to session aur glow saaf band karo, leak na ho
     DisposableEffect(Unit) { onDispose { if ((ctx as? android.app.Activity)?.isFinishing == true) { live.stop(); off.release() } } }
@@ -603,12 +603,12 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     }
     var hd by remember { mutableStateOf(prefs.getBoolean("hud", true)) }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Jarvis ring (Divya se baat karte waqt screen par ghoomta gola)", color = th.text, modifier = Modifier.weight(1f))
+        Text("Voice orb (Divya se baat karte waqt awaaz ke saath naachta gola + live caption)", color = th.text, modifier = Modifier.weight(1f))
         Switch(hd, { hd = it; prefs.edit().putBoolean("hud", it).apply(); if (!it) com.divya.ai.glow.HudOverlay.hide() })
     }
     var hdd by remember { mutableStateOf(prefs.getBoolean("hudDim", true)) }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Ring ke peeche andhera (full screen, ring par tap = Divya band). Band karo to peeche ka app dikhega", color = th.text, modifier = Modifier.weight(1f))
+        Text("Orb ke peeche halka andhera (orb chhota rehta hai, touch/Back neeche ke app ko hi jaata hai)", color = th.text, modifier = Modifier.weight(1f))
         Switch(hdd, { hdd = it; prefs.edit().putBoolean("hudDim", it).apply(); com.divya.ai.glow.HudOverlay.hide() })
     }
     Text("Ring ke liye Accessibility ya 'Display over other apps' permission ON honi chahiye.", color = th.text.copy(alpha = 0.6f), fontSize = 11.sp)

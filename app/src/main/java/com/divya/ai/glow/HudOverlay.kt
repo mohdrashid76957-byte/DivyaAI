@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -16,23 +17,25 @@ import android.view.View
 import android.view.WindowManager
 import com.divya.ai.AvatarBus
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.max
 import kotlin.math.sin
 
 /**
- * v2.22.8: Jarvis jaisa HUD - Divya se baat karte waqt screen ke beech mein ghoomte neon gole (rings) + "DIVYA".
- * GlowOverlay.show/setState/hide ke saath apne aap chalta hai (Settings > "Jarvis ring").
- * - Divya bolti hai to rings uski awaaz ke saath dhadakte hain (AvatarBus.level).
- * - Divya koi kaam karti hai (tool chalte waqt, state THINKING) to ring chhota hoke upar chala jata hai aur andhera hat jata hai, taaki kaam dikhe.
- * - Andhere wale mode mein ring par tap = Divya band. "Andhera" band ho to poora pass-through (touch neeche ke app ko jaata hai).
+ * v2.22.10: Voice orb (reference video jaisa). Divya se baat karte waqt screen ke neeche-beech (dock ke upar) ek chhota gola:
+ *  - shant hone par chhota, beech mein chamakta dot + patli ring.
+ *  - awaaz (meri mic ki ya Divya ki) ke saath gola bada hota hai, uska kinara kaante jaisa (jagged) naachta hai, bahar ripple rings nikalti hain.
+ *  - neeche live caption pill: "LISTENING...", phir jo suna/bola ja raha hai, kaam ke waqt "WORKING...".
+ *  - THINKING mein ghoomte arcs + violet rang.
+ * Touch bilkul pass-through (Back/Home/gesture kuch block nahi hota) aur ye Divya ko band nahi karta.
  * Permission: Accessibility ON (DivyaService) ya "Display over other apps".
  */
 object HudOverlay {
+    /** Purana tap-to-stop hook, ab kabhi call nahi hota (MainActivity compile ke liye rakha hai). */
     @Volatile var onTap: (() -> Unit)? = null
     private var view: HudView? = null
     private var wm: WindowManager? = null
-    private var lp: WindowManager.LayoutParams? = null
-    private var dimFull = true
 
     fun show(context: Context, state: GlowState = GlowState.IDLE) {
         if (view != null) { setState(state); return }
@@ -44,72 +47,71 @@ object HudOverlay {
         val sw: Int; val sh: Int
         if (Build.VERSION.SDK_INT >= 30) { val b = manager.maximumWindowMetrics.bounds; sw = b.width(); sh = b.height() }
         else { val dm = android.util.DisplayMetrics(); @Suppress("DEPRECATION") manager.defaultDisplay.getRealMetrics(dm); sw = dm.widthPixels; sh = dm.heightPixels }
-        dimFull = base.getSharedPreferences("divya", 0).getBoolean("hudDim", true)
+        val w = (minOf(sw, sh) * 0.92f).toInt()
+        val h = (w * 0.92f).toInt()
+        val halo = base.getSharedPreferences("divya", 0).getBoolean("hudDim", true)
         val l = WindowManager.LayoutParams(
-            sw, sh, type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            w, h, type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or      // poora pass-through
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         )
-        l.gravity = android.view.Gravity.TOP or android.view.Gravity.START
-        l.x = 0; l.y = 0
-        if (Build.VERSION.SDK_INT >= 30) l.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-        else if (Build.VERSION.SDK_INT >= 28) l.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        val v = HudView(base).also { it.state = state; it.dimFull = dimFull }
+        l.gravity = android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL
+        // orb ka kendra screen ki ~72% unchai par (video mein dock ke thoda upar), pill uske neeche
+        l.y = (sh * 0.72f - h * HudView.CY).toInt().coerceAtLeast(0)
+        val v = HudView(base).also { it.state = state; it.halo = halo }
         try { manager.addView(v, l) } catch (_: Exception) { return }
-        wm = manager; lp = l; view = v
-        touch(state)
+        wm = manager; view = v
     }
 
-    fun setState(state: GlowState) { view?.state = state; touch(state) }
-
-    /** Andhere wale mode mein touchable (tap = band), par kaam chalte waqt (THINKING) pass-through taaki Divya ke gesture/tap block na hon. */
-    private fun touch(state: GlowState) {
-        val l = lp ?: return; val v = view ?: return
-        val touchable = dimFull && state != GlowState.THINKING
-        val f = if (touchable) l.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv() else l.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        if (f != l.flags) { l.flags = f; try { wm?.updateViewLayout(v, l) } catch (_: Exception) {} }
-    }
+    fun setState(state: GlowState) { view?.state = state }
 
     fun hide() {
         val v = view ?: return
         val m = wm
-        view = null; wm = null; lp = null
+        view = null; wm = null
         v.animate().alpha(0f).setDuration(220).withEndAction { try { m?.removeView(v) } catch (_: Exception) {} }.start()
     }
 }
 
 private class HudView(ctx: Context) : View(ctx) {
+    companion object { const val CY = 0.40f }   // orb ka kendra window ki unchai ka 40% par
+
     var state: GlowState = GlowState.IDLE
-    var dimFull = true
+    var halo = true
 
-    private class Ring(val r: Float, val sw: Float, val n: Int, val fill: Float, val speed: Float, val a: Float, val glow: Boolean)
-    // video jaisa: patli dashed ring, moti segmented band, beech ki dashes, patli arcs, chamakdar chhote arcs, sabse bahar halki arcs
-    private val rings = listOf(
-        Ring(0.46f, 1.6f, 90, 0.55f, 10f, 0.55f, false),
-        Ring(0.55f, 13f, 4, 0.80f, -22f, 0.95f, true),
-        Ring(0.66f, 5f, 18, 0.62f, 34f, 0.85f, true),
-        Ring(0.76f, 2.5f, 3, 0.62f, -14f, 0.90f, false),
-        Ring(0.86f, 6f, 2, 0.30f, 48f, 1.00f, true),
-        Ring(0.95f, 1.6f, 6, 0.50f, -8f, 0.60f, false)
-    )
-
+    private val N = 72
     private val dp = ctx.resources.displayMetrics.density
-    private val sp = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.BUTT }
-    private val fp = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val tpFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE; textAlign = Paint.Align.CENTER; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0.12f
+    private val cur = FloatArray(N)
+    private val tgt = FloatArray(N)
+    private val cur2 = FloatArray(N)
+    private val tgt2 = FloatArray(N)
+    private val rnd = java.util.Random()
+    private var nextJit = 0L
+
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND }
+    private val txt = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER; typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD); letterSpacing = 0.06f
     }
-    private val tpGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; textAlign = Paint.Align.CENTER; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0.12f
-    }
+    private val path = Path()
     private val oval = RectF()
+    private val pill = RectF()
+
     private val born = SystemClock.uptimeMillis()
     private var last = born
     private var spin = 0f
-    private var compact = 0f
-    private var dim = 0f
+    private var think = 0f
     private var lvl = 0f
-    private var col = 0xFF00C8FF.toInt()
+    private var col = 0xFF1EB4FF.toInt()
+    private var pillW = 0f
+    private var shownText = ""
+    private var shownSrc = ""
+    private var lastRipple = 0L
+    private val ripple = FloatArray(3) { -1f }
 
     private fun mix(a: Int, b: Int, t: Float): Int = Color.argb(
         (Color.alpha(a) + (Color.alpha(b) - Color.alpha(a)) * t).toInt(),
@@ -118,72 +120,153 @@ private class HudView(ctx: Context) : View(ctx) {
         (Color.blue(a) + (Color.blue(b) - Color.blue(a)) * t).toInt()
     )
 
-    override fun onTouchEvent(e: MotionEvent): Boolean {
-        if (e.action == MotionEvent.ACTION_UP) HudOverlay.onTap?.invoke()
-        return true
+    override fun onTouchEvent(e: MotionEvent): Boolean = false
+
+    private fun circle(c: Canvas, cx: Float, cy: Float, r: Float, color: Int, a: Float) {
+        fill.color = color; fill.alpha = (255f * a).toInt().coerceIn(0, 255); c.drawCircle(cx, cy, r, fill)
     }
 
-    private fun arcs(c: Canvas, cx: Float, cy: Float, rr: Float, sw: Float, n: Int, fill: Float, rot: Float, a: Float, glow: Boolean) {
-        oval.set(cx - rr, cy - rr, cx + rr, cy + rr)
-        val step = 360f / n
-        val passes = if (glow) 3 else 1
-        for (ps in 0 until passes) {
-            val top = ps == passes - 1
-            sp.strokeWidth = if (glow) (if (ps == 0) sw * 2.8f else if (ps == 1) sw * 1.8f else sw) else sw
-            sp.color = col
-            sp.alpha = (255f * (a * (if (!glow || top) 1f else if (ps == 0) 0.10f else 0.20f)).coerceIn(0f, 1f)).toInt()
-            for (k in 0 until n) c.drawArc(oval, rot + k * step, step * fill, false, sp)
+    private fun ringLine(c: Canvas, cx: Float, cy: Float, r: Float, sw: Float, a: Float) {
+        line.strokeWidth = sw; line.color = col; line.alpha = (255f * a).toInt().coerceIn(0, 255); c.drawCircle(cx, cy, r, line)
+    }
+
+    /** Kaante jaisa naachta kinara: har point ka radius random target ki taraf smooth hota hai, awaaz se amp badhta hai. */
+    private fun jag(c: Canvas, cx: Float, cy: Float, r: Float, arr: FloatArray, amp: Float, sw: Float, a: Float) {
+        path.reset()
+        for (i in 0 until N) {
+            val ang = i * 2f * PI.toFloat() / N
+            val rr = r * (1f + amp * arr[i])
+            val x = cx + rr * cos(ang); val y = cy + rr * sin(ang)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
+        path.close()
+        line.color = col
+        line.strokeWidth = sw * 3.2f; line.alpha = (255f * a * 0.18f).toInt(); c.drawPath(path, line)
+        line.strokeWidth = sw; line.alpha = (255f * a).toInt().coerceIn(0, 255); c.drawPath(path, line)
+    }
+
+    private fun newTargets(act: Float) {
+        for (i in 0 until N) {
+            val spike = if (rnd.nextFloat() < 0.16f) 1f else 0.30f
+            tgt[i] = (rnd.nextFloat() * 2f - 1f) * spike * act
+            tgt2[i] = (rnd.nextFloat() * 2f - 1f) * (spike * 0.8f) * act
+        }
+        // thoda smooth taaki "aas-paas ke point" milkar uthen (organic), par spikes bache rahein
+        for (i in 0 until N) { val a = tgt[(i + 1) % N]; val b = tgt[(i + N - 1) % N]; tgt[i] = tgt[i] * 0.65f + (a + b) * 0.175f }
     }
 
     override fun onDraw(c: Canvas) {
         val now = SystemClock.uptimeMillis()
         val dt = (now - last).coerceIn(1L, 64L) / 1000f
         last = now
-        val target = when (state) { GlowState.IDLE -> 0xFF2F8CFF; GlowState.LISTENING -> 0xFF00C8FF; GlowState.SPEAKING -> 0xFF18E0FF; GlowState.THINKING -> 0xFF8A7CFF }.toInt()
+
+        val target = when (state) { GlowState.IDLE -> 0xFF2F8CFF; GlowState.LISTENING -> 0xFF1EB4FF; GlowState.SPEAKING -> 0xFF2AE0FF; GlowState.THINKING -> 0xFF8A7CFF }.toInt()
         col = mix(col, target, 1f - exp(-5f * dt))
-        val tc = if (state == GlowState.THINKING) 1f else 0f
-        compact += (tc - compact) * (1f - exp(-5f * dt))
-        val td = if (dimFull) 0.86f * (1f - compact) else 0f
-        dim += (td - dim) * (1f - exp(-5f * dt))
-        lvl += (AvatarBus.level - lvl) * (1f - exp(-14f * dt))
-        val mult = when (state) { GlowState.THINKING -> 2.2f; GlowState.SPEAKING -> 1.35f; GlowState.LISTENING -> 1f; GlowState.IDLE -> 0.6f } + lvl * 1.2f
-        spin += dt * mult
+        think += ((if (state == GlowState.THINKING) 1f else 0f) - think) * (1f - exp(-5f * dt))
+
+        // awaaz: Divya bol rahi ho to uski, sunte waqt meri mic ki (halka shor hata ke)
+        val mic = if (state == GlowState.LISTENING) ((AvatarBus.micLevel - 0.07f) / 0.93f).coerceIn(0f, 1f) else 0f
+        val raw = max(AvatarBus.level, mic)
+        lvl += (raw - lvl) * (1f - exp(-(if (raw > lvl) 30f else 9f) * dt))
+        spin += dt * (0.5f + 1.6f * think + 0.8f * lvl)
+
         val fade = ((now - born) / 300f).coerceIn(0f, 1f)
-        val ga = fade * (1f - 0.45f * compact)
-
         val w = width.toFloat(); val h = height.toFloat()
-        if (dim > 0.01f) c.drawColor(Color.argb((dim * 255f).toInt().coerceIn(0, 255), 0, 5, 14))
-        val breathe = 1f + 0.015f * sin((now % 2400L) / 2400f * 2f * PI.toFloat())
-        val r0 = minOf(w, h) / 2f * 0.96f
-        val rr = r0 * (1f - 0.66f * compact) * breathe * (1f + 0.05f * lvl)
-        val cx = w / 2f
-        val cy = h / 2f + (h * 0.14f - h / 2f) * compact
-        val k = rr / r0
+        val cx = w / 2f; val cy = h * CY
+        val breathe = 1f + 0.025f * sin((now % 2600L) / 2600f * 2f * PI.toFloat())
+        val base = w * 0.075f
+        val r = base * (1f + 1.05f * lvl) * breathe
+        val ga = fade
 
-        // beech ki halki chamak (awaaz ke saath badhti hai)
-        for (i in 0..4) {
-            fp.color = col
-            fp.alpha = ((10f + 22f * lvl) * ga).toInt().coerceIn(0, 255)
-            c.drawCircle(cx, cy, rr * (0.52f - i * 0.08f), fp)
+        // naachte kinare ke targets
+        if (now >= nextJit) {
+            nextJit = now + 70L
+            newTargets(if (lvl > 0.04f) 1f else 0.15f)
         }
-        sp.strokeWidth = 1.5f * dp * k; sp.color = col; sp.alpha = (130f * ga).toInt()
-        c.drawCircle(cx, cy, rr * 0.38f, sp)
+        val k = 1f - exp(-20f * dt)
+        for (i in 0 until N) { cur[i] += (tgt[i] - cur[i]) * k; cur2[i] += (tgt2[i] - cur2[i]) * k }
+        val amp = 0.04f + 0.46f * lvl + 0.10f * think
 
-        for ((i, rg) in rings.withIndex()) {
-            val rot = rg.speed * spin + i * 37f
-            arcs(c, cx, cy, rr * rg.r, rg.sw * dp * k, rg.n, rg.fill, rot, rg.a * ga, rg.glow)
+        // ripple: awaaz tez ho to naya ring bahar nikalta hai
+        if (lvl > 0.33f && now - lastRipple > 420L) {
+            val slot = ripple.indexOfFirst { it < 0f }
+            if (slot >= 0) { ripple[slot] = 0f; lastRipple = now }
         }
+        for (i in ripple.indices) if (ripple[i] >= 0f) { ripple[i] += dt * 0.9f; if (ripple[i] >= 1f) ripple[i] = -1f }
 
-        // "DIVYA"
-        val ts = rr * 0.23f
-        tpGlow.textSize = ts; tpFill.textSize = ts
-        tpGlow.strokeWidth = ts * 0.14f; tpGlow.color = col; tpGlow.alpha = (90f * ga).toInt()
-        tpFill.alpha = (255f * ga).toInt()
-        val ty = cy - (tpFill.ascent() + tpFill.descent()) / 2f
-        c.drawText("DIVYA", cx, ty, tpGlow)
-        c.drawText("DIVYA", cx, ty, tpFill)
+        // peeche halki chamak (halo)
+        if (halo) for (i in 0..5) circle(c, cx, cy, r * (2.3f - i * 0.28f), col, (0.012f + 0.02f * lvl) * ga)
+        // bahar ki patli rings
+        ringLine(c, cx, cy, base * (1.62f + 0.35f * lvl + 0.04f * sin(spin * 2f)), 1.0f * dp, 0.22f * ga)
+        ringLine(c, cx, cy, base * (2.15f + 0.75f * lvl), 1.0f * dp, 0.12f * ga)
+        for (i in ripple.indices) {
+            val p = ripple[i]; if (p < 0f) continue
+            ringLine(c, cx, cy, r * (1.25f + 1.7f * p), 1.4f * dp, (1f - p) * 0.45f * ga)
+        }
+        // ghoomte arcs (THINKING mein saaf, baaki mein halke)
+        oval.set(cx - r * 1.30f, cy - r * 1.30f, cx + r * 1.30f, cy + r * 1.30f)
+        line.color = col; line.strokeWidth = 1.6f * dp; line.alpha = (255f * (0.22f + 0.70f * think) * ga).toInt()
+        for (kk in 0 until 3) c.drawArc(oval, spin * 55f + kk * 120f, 38f, false, line)
 
+        // gola (dark teal, shishe jaisa)
+        circle(c, cx, cy, r, mix(col, Color.BLACK, 0.80f), 0.88f * ga)
+        circle(c, cx, cy, r * 0.72f, mix(col, Color.BLACK, 0.62f), 0.40f * ga)
+        circle(c, cx, cy, r * 0.40f, mix(col, Color.BLACK, 0.45f), 0.30f * ga)
+
+        // kaante jaisa naachta kinara (do layer)
+        jag(c, cx, cy, r, cur, amp, 1.6f * dp, 0.95f * ga)
+        jag(c, cx, cy, r * 0.93f, cur2, amp * 0.8f, 1.0f * dp, 0.50f * ga)
+
+        // beech ka chamakta dot
+        val dr = (3.2f + 4.5f * lvl) * dp
+        circle(c, cx, cy, dr * 3.2f, col, 0.10f * ga)
+        circle(c, cx, cy, dr * 1.9f, col, 0.22f * ga)
+        circle(c, cx, cy, dr, mix(col, Color.WHITE, 0.30f), 1f * ga)
+
+        drawCaption(c, w, h, dt, now, ga)
         postInvalidateOnAnimation()
+    }
+
+    private fun captionText(now: Long): String {
+        val cap = AvatarBus.caption.trim()
+        val age = now - AvatarBus.captionAt
+        val dots = ".".repeat(1 + ((now / 380L) % 3L).toInt())
+        return when {
+            state == GlowState.THINKING && (cap.isEmpty() || age > 2500L) -> "WORKING$dots"
+            cap.isNotEmpty() && age < 4500L -> cap.uppercase().replace('\n', ' ')
+            state == GlowState.LISTENING -> "LISTENING$dots"
+            state == GlowState.SPEAKING -> "SPEAKING$dots"
+            else -> "READY"
+        }
+    }
+
+    private fun drawCaption(c: Canvas, w: Float, h: Float, dt: Float, now: Long, ga: Float) {
+        txt.textSize = 11f * dp
+        val maxW = w * 0.94f - 28f * dp
+        var s = captionText(now)
+        if (s != shownSrc) {
+            shownSrc = s
+            if (txt.measureText(s) > maxW) {
+                // lamba ho to shuru ka hissa kaato, naye shabd dikhte rahein
+                var t = s
+                while (t.length > 4 && txt.measureText("…$t") > maxW) t = t.substring(1)
+                s = "…" + t.trimStart()
+            }
+            shownText = s
+        }
+        val tw = txt.measureText(shownText)
+        val targetW = tw + 28f * dp
+        pillW += (targetW - pillW) * (1f - exp(-14f * dt))
+        if (pillW < 40f * dp) pillW = targetW
+        val cx = w / 2f
+        val ph = 26f * dp
+        val top = h * 0.80f - ph / 2f
+        pill.set(cx - pillW / 2f, top, cx + pillW / 2f, top + ph)
+        fill.color = Color.rgb(3, 14, 28); fill.alpha = (225f * ga).toInt(); c.drawRoundRect(pill, 9f * dp, 9f * dp, fill)
+        line.color = col
+        line.strokeWidth = 4f * dp; line.alpha = (255f * 0.15f * ga).toInt(); c.drawRoundRect(pill, 9f * dp, 9f * dp, line)
+        line.strokeWidth = 1.2f * dp; line.alpha = (255f * 0.85f * ga).toInt(); c.drawRoundRect(pill, 9f * dp, 9f * dp, line)
+        txt.color = mix(col, Color.WHITE, 0.55f); txt.alpha = (255f * ga).toInt()
+        c.drawText(shownText, cx, top + ph / 2f - (txt.ascent() + txt.descent()) / 2f, txt)
     }
 }
