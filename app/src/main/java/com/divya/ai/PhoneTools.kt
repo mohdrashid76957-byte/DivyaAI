@@ -65,9 +65,13 @@ object PhoneTools {
     }
 
     /** Google News RSS: taaza headlines (key nahi chahiye). */
-    private fun newsRss(q: String): List<String> {
+    private fun newsTopic(q: String): String {
         val generic = Regex("\\b(aaj|badi|bade|top|latest|taaza|breaking|india|desh|news|khabar|khabre|khabren|batao|bataiye|ki|ka|ke|kya|hai)\\b", RegexOption.IGNORE_CASE)
-        val topic = q.replace(generic, " ").replace(Regex("\\s+"), " ").trim()
+        return q.replace(generic, " ").replace(Regex("\\s+"), " ").trim()
+    }
+
+    private fun newsRss(q: String): List<String> {
+        val topic = newsTopic(q)
         val url = if (topic.length < 3) "https://news.google.com/rss?hl=hi&gl=IN&ceid=IN:hi"
         else "https://news.google.com/rss/search?q=" + Uri.encode(topic) + "&hl=hi&gl=IN&ceid=IN:hi"
         val x = httpGet(url, UA_WEB) ?: return emptyList()
@@ -108,25 +112,58 @@ object PhoneTools {
         if (lines.isEmpty()) lines = bing(q)
         if (lines.isEmpty()) lines = wiki(q)
         if (lines.isEmpty()) return "failed: internet se koi nateeja nahi mila (net check karo)"
-        return "done: Ye seedha web se mile nateeje hain (Gemini ka limit khatam tha). Inhe padhkar user ko simple Hinglish mein 3-5 chhoti lines mein batao, link mat bolo:\n" +
+        return "done: Ye taaza nateeje seedha web se mile hain. Inhe padhkar TURANT user ko simple Hinglish mein 3-4 chhoti lines mein batao (pehli line mein sabse badi baat), link mat bolo:\n" +
             lines.mapIndexed { i, l -> "${i + 1}) ${l.take(220)}" }.joinToString("\n")
     }
 
-    /** Google Search se jude (grounded) Gemini jawab; limit/error par seedha web nateeje. Background thread par chalao. */
+    // ---- FAST SEARCH: cache + headlines prefetch + parallel lanes (news ~0.5 sec) ----
+    private val searchCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, String>>()
+    @Volatile private var headlines: Pair<Long, List<String>>? = null
+    private val searchPool = java.util.concurrent.Executors.newCachedThreadPool()
+
+    /** Session shuru hote hi top headlines background mein le aao: "aaj ki khabar" ka jawab turant. */
+    fun prefetchNews(c: Context) {
+        searchPool.execute { try { val l = newsRss(""); if (l.isNotEmpty()) headlines = System.currentTimeMillis() to l } catch (_: Throwable) {} }
+    }
+
+    private fun geminiAnswer(c: Context, query: String): String = try {
+        val today = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", Locale.ENGLISH).format(java.util.Date())
+        val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", query))))
+        val sys = "You are a fast live-web research helper for a voice assistant in India. Today is $today (IST). Use Google Search and answer with the LATEST facts in simple Hinglish, " +
+            "maximum 5 short lines, plain text only (no markdown, no URLs, no asterisks). Put the key fact in the FIRST line. For news give the top 3-4 headlines with one short line each. If you could not find it, say so."
+        val r = ProEngine.stream(c, sys, contents, 0, true, AtomicBoolean(false)) { }
+        if (r.isNotBlank()) "done: " + r.trim().take(1400) else { geminiSearchFailAt = System.currentTimeMillis(); "" }
+    } catch (_: Throwable) { geminiSearchFailAt = System.currentTimeMillis(); "" }
+
+    private fun <T> waitFor(f: java.util.concurrent.Future<T>, ms: Long): T? =
+        try { f.get(ms, TimeUnit.MILLISECONDS) } catch (_: Throwable) { null }
+
+    /** Tez web search. Cache (90 sec) -> prefetch headlines (0 ms) -> news: RSS (~0.5 sec) -> baaki: Gemini grounded aur seedha web saath-saath, jo pehle aaye. */
     fun webSearch(c: Context, query: String): String {
         if (query.isBlank()) return "failed: sawaal khali hai"
-        if (System.currentTimeMillis() - geminiSearchFailAt > 10 * 60_000L) {
-            try {
-                val today = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", Locale.ENGLISH).format(java.util.Date())
-                val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", query))))
-                val sys = "You are a fast live-web research helper for a voice assistant in India. Today is $today (IST). Use Google Search and answer with the LATEST facts in simple Hinglish, " +
-                    "maximum 6 short lines, plain text only (no markdown, no URLs, no asterisks). For news give the top 4-5 headlines with one short line each. If you could not find it, say so."
-                val r = ProEngine.stream(c, sys, contents, 0, true, AtomicBoolean(false)) { }
-                if (r.isNotBlank()) return "done: " + r.trim().take(1600)
-            } catch (_: Throwable) { }
-            geminiSearchFailAt = System.currentTimeMillis()   // 10 min tak Gemini search chhodke seedha web
+        val now = System.currentTimeMillis(); val key = query.lowercase().trim()
+        fun keep(r: String): String { if (r.startsWith("done")) searchCache[key] = System.currentTimeMillis() to r; return r }
+        searchCache[key]?.let { if (now - it.first < 90_000) return it.second }
+        val news = looksNews(query)
+        if (news && newsTopic(query).length < 3) headlines?.let { h ->
+            if (now - h.first < 10 * 60_000L && h.second.isNotEmpty())
+                return keep("done: Ye abhi ki top headlines hain. Inhe TURANT 3-4 chhoti Hinglish lines mein batao (pehli line mein sabse badi khabar), link mat bolo:\n" +
+                    h.second.take(6).mapIndexed { i, l -> "${i + 1}) ${l.take(200)}" }.joinToString("\n"))
         }
-        return try { fallbackSearch(query) } catch (e: Throwable) { "failed: web search nahi chali: ${e.message}" }
+        val direct = searchPool.submit(java.util.concurrent.Callable { try { fallbackSearch(query) } catch (e: Throwable) { "failed: ${e.message}" } })
+        if (news) waitFor(direct, 2500)?.let { if (it.startsWith("done")) return keep(it) }
+        val gemOk = System.currentTimeMillis() - geminiSearchFailAt > 10 * 60_000L
+        if (gemOk) {
+            val gem = searchPool.submit(java.util.concurrent.Callable { geminiAnswer(c, query) })
+            val end = SystemClock.uptimeMillis() + 7000
+            while (SystemClock.uptimeMillis() < end) {
+                if (gem.isDone) { val g = try { gem.get() } catch (_: Throwable) { "" }; if (g.startsWith("done")) return keep(g); break }
+                if (direct.isDone) { val d = try { direct.get() } catch (_: Throwable) { "" }; if (d.startsWith("done") && !news) { /* seedha web mila, par Gemini ko thoda aur mauka */ if (SystemClock.uptimeMillis() > end - 4500) return keep(d) } }
+                nap(40)
+            }
+        }
+        val d = waitFor(direct, 4000) ?: return "failed: web search time par nahi mili (net check karo)"
+        return keep(d)
     }
 
     /** Google search ke nateeje screen par dikhao (Google app / browser mein). */
