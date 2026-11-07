@@ -291,61 +291,82 @@ class DivyaService : AccessibilityService() {
         return null
     }
 
-    /** YouTube par song search karke pehla result seedha play karta hai. */
-    /** YouTube search page se pehle video ka ID nikalo (UI tap par nirbhar nahi). Video-only filter => Shorts/channel/playlist skip. */
-    private fun firstVideoId(q: String): String? = try {
-        val http = okhttp3.OkHttpClient.Builder().connectTimeout(4, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(6, java.util.concurrent.TimeUnit.SECONDS).build()
-        val req = okhttp3.Request.Builder()
-            .url("https://www.youtube.com/results?search_query=" + android.net.Uri.encode(q) + "&sp=EgIQAQ%3D%3D")
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36")
-            .header("Accept-Language", "en-US,en;q=0.9").build()
-        http.newCall(req).execute().use { r ->
-            val body = r.body?.string()
-            if (body == null) null else Regex("\"videoId\":\"([A-Za-z0-9_-]{11})\"").find(body)?.groupValues?.get(1)
+    /** YouTube search page se pehle video ka ID nikalo. Slow net ke liye lamba timeout + 2 koshish (filter ke saath, phir bina filter). */
+    private fun firstVideoId(q: String): String? {
+        val http = okhttp3.OkHttpClient.Builder().connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(14, java.util.concurrent.TimeUnit.SECONDS).retryOnConnectionFailure(true).build()
+        val urls = listOf(
+            "https://www.youtube.com/results?search_query=" + android.net.Uri.encode(q) + "&sp=EgIQAQ%3D%3D",
+            "https://www.youtube.com/results?search_query=" + android.net.Uri.encode(q))
+        for (u in urls) {
+            try {
+                val req = okhttp3.Request.Builder().url(u)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36")
+                    .header("Accept-Language", "en-US,en;q=0.9").build()
+                http.newCall(req).execute().use { r ->
+                    val body = r.body?.string()
+                    val id = if (body == null) null else Regex("\"videoId\":\"([A-Za-z0-9_-]{11})\"").find(body)?.groupValues?.get(1)
+                    if (id != null) return id
+                }
+            } catch (_: Exception) {}
         }
-    } catch (e: Exception) { null }
+        return null
+    }
 
     private fun tapCenter(n: AccessibilityNodeInfo): Boolean {
         val r = Rect(); n.getBoundsInScreen(r)
         return tapAt(r.centerX().toFloat(), r.centerY().toFloat())
     }
 
+    /** Player khula ho par video ruka (paused) ho to Play dabao. Slow net par video buffer hota rehta hai, isliye thoda ruk kar dekhte hain. */
+    private fun ensurePlaying() {
+        for (k in 0 until 3) {
+            val paused = findNodes { n -> (n.contentDescription?.toString() ?: "").lowercase().let { it == "play video" || it == "play" } }.firstOrNull()
+            if (paused != null) { clickNode(paused); nap(700) } else return
+        }
+    }
+
     fun playOnYoutube(q: String): String {
-        // Tarika 1 (sabse pakka): video ID nikalo aur seedha watch link kholo -> YouTube app mein khud play hota hai
-        firstVideoId(q)?.let { id ->
-            val ytp = "com.google.android.youtube"
-            val wi = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=$id")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (packageManager.getLaunchIntentForPackage(ytp) != null) wi.setPackage(ytp)
-            try {
-                startActivity(wi); waitOpen(ytp, 4000)
-                return "done: playing '$q' (video $id)"
-            } catch (_: Exception) {}
+        val ytp = "com.google.android.youtube"
+        val hasApp = packageManager.getLaunchIntentForPackage(ytp) != null
+        // Tarika 1: video ID nikalo -> app mein seedha kholo (pehle vnd.youtube:, phir https watch link)
+        val id = firstVideoId(q)
+        if (id != null) {
+            val intents = listOf(
+                Intent(Intent.ACTION_VIEW, android.net.Uri.parse("vnd.youtube:$id")),
+                Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=$id")))
+            for (wi in intents) {
+                wi.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (hasApp) wi.setPackage(ytp)
+                try { startActivity(wi) } catch (_: Exception) { continue }
+                waitOpen(ytp, 5000)
+                // asli confirmation: player screen dikha? (slow net par 10 sec tak intezaar)
+                if (waitPlayer(10000)) { ensurePlaying(); return "done: playing '$q' (video $id)" }
+            }
         }
         // Tarika 2 (backup): search page kholkar UI se tap
         val uri = android.net.Uri.parse("https://www.youtube.com/results?search_query=" + android.net.Uri.encode(q))
-        val yt = "com.google.android.youtube"
         val i = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (packageManager.getLaunchIntentForPackage(yt) != null) i.setPackage(yt)
+        if (hasApp) i.setPackage(ytp)
         try { startActivity(i) } catch (e: Exception) { return "failed: YouTube nahi khula" }
-        waitOpen(yt, 4000)
-        val end = SystemClock.uptimeMillis() + 8000
+        waitOpen(ytp, 5000)
+        val end = SystemClock.uptimeMillis() + 15000
         var tries = 0
-        while (SystemClock.uptimeMillis() < end && tries < 3) {
+        while (SystemClock.uptimeMillis() < end && tries < 4) {
             val v = findFirstVideo(rootInActiveWindow)
             if (v != null) {
                 tries++
                 tapCenter(v)                       // YouTube kai baar ACTION_CLICK ignore karta hai, isliye pehle asli touch
-                if (waitPlayer(2500)) return "done: playing first result for $q"
+                if (waitPlayer(5000)) { ensurePlaying(); return "done: playing first result for $q" }
                 clickNode(v)
-                if (waitPlayer(2500)) return "done: playing first result for $q"
+                if (waitPlayer(5000)) { ensurePlaying(); return "done: playing first result for $q" }
             }
-            nap(150)
+            nap(300)
         }
         val dm = resources.displayMetrics
         tapAt(dm.widthPixels / 2f, dm.heightPixels * 0.32f)
-        if (waitPlayer(3000)) return "done: playing (fallback tap) for $q"
-        return "done?: result par tap kiya par player confirm nahi hua. Screen: " + readScreen(400)
+        if (waitPlayer(6000)) { ensurePlaying(); return "done: playing (fallback tap) for $q" }
+        return "failed: video play confirm nahi hua (net slow ho sakta hai). Screen: " + readScreen(400)
     }
 
     /** YouTube ka watch/player screen khula? (Minimize / Pause / Fullscreen button dikhe) */

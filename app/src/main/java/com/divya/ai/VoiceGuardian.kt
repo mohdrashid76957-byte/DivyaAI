@@ -99,12 +99,14 @@ object VoiceGuardian {
         if (fr.size < VoicePrint.MIN_VOICED) return Speaker("unverified", "", 0.0, 0.0, 0)
         val sens = p.getFloat("vpSens", 1f)
         var bestRole = "unknown"; var bestName = ""; var bestRatio = Double.MAX_VALUE; var bestSc = 0.0; var bestLim = 1.0
+        var bestMd: VpModel? = null
         for ((role, name, md) in people) {
             val sc = VoicePrint.matchScore(md, fr); val lim = VoicePrint.limit(md, sens)
             val ratio = sc / lim
-            if (ratio < bestRatio) { bestRatio = ratio; bestRole = role; bestName = name; bestSc = sc; bestLim = lim }
+            if (ratio < bestRatio) { bestRatio = ratio; bestRole = role; bestName = name; bestSc = sc; bestLim = lim; bestMd = md }
         }
         val matched = bestRatio <= 1.0
+        if (matched && bestRole == "owner" && bestRatio < 0.8) bestMd?.let { VoicePrint.adapt(p, it, fr) }
         // Indicative confidence: match mein 50-100, no-match mein 0-50
         val conf = if (matched) (50 + 50 * (1 - bestRatio)).toInt() else (50 / bestRatio).toInt().coerceIn(0, 49)
         return Speaker(if (matched) bestRole else "unknown", if (matched) bestName else "", bestSc, bestLim, conf)

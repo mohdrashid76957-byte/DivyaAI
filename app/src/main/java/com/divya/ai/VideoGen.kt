@@ -34,6 +34,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
@@ -57,9 +58,13 @@ object VideoBus {
  */
 object VideoGen {
     private const val TAG = "DivyaVideoGen"
-    const val W = 576      // encode size (halka = tez)
-    const val H = 1024
-    const val FPS = 15
+    const val W = 720      // encode size: HD 9:16
+    const val H = 1280
+    const val FPS = 24     // 15 se 24: camera move smooth, "slideshow" jaisa nahi lagta
+    private const val IW = 576   // AI image ka size (HD tak upscale hoti hai)
+    private const val IH = 1024
+    @Volatile private var refBmp: Bitmap? = null     // scene 1 ki image: baaki scenes mein SAME character rakhne ke liye
+    @Volatile private var gDead = false              // Gemini image quota/permission band ho to baar-baar mat try karo
     private const val DW = 720f   // design space (drawing coordinates)
     private const val DH = 1280f
 
@@ -100,7 +105,7 @@ object VideoGen {
         val seconds = secs.coerceIn(10, 60)
         val isEn = lang.startsWith("en", true)
         val ai = visuals != "fast" && visuals != "instant"
-        imgErr = ""
+        imgErr = ""; refBmp = null; gDead = false
         val plan = (if (!ai) localPlan(topic.trim(), script, captions, style) else null) ?: run { onStage(if (ai) "Kahani aur scenes likh rahi hoon…" else "Script likh rahi hoon…"); writePlan(c, topic.trim(), isEn, seconds, style, ai) }
 
         // visuals background threads mein (AI images ya photos), TTS saath-saath
@@ -110,13 +115,16 @@ object VideoGen {
         val seed = (System.currentTimeMillis() % 90000).toInt() + 1000
         // SPEED: saari scenes ki images ek saath (parallel). Jaise hi ek image tayyar hoti hai wo `shared` list mein aa jati hai
         // aur live preview use turant dikha deta hai -> preview ko saari images ka intezaar nahi karna padta.
-        val pool = Executors.newFixedThreadPool(if (ai) min(8, plan.scenes.size).coerceAtLeast(1) else 3)
+        val pool = Executors.newFixedThreadPool(if (ai) min(3, plan.scenes.size).coerceAtLeast(1) else 3)   // 8 saath mein bhejne se free server rok deta tha -> baaki scenes mein wahi ek image repeat hoti thi
+        val first = java.util.concurrent.CountDownLatch(1)
         val used = java.util.Collections.synchronizedSet(mutableSetOf<Long>())
         val shared: MutableList<Bitmap?> = java.util.Collections.synchronizedList(MutableList<Bitmap?>(plan.scenes.size) { null })
         val futs: List<Future<Bitmap?>> = plan.scenes.mapIndexed { i, s ->
             pool.submit<Bitmap?> {
-                val b = if (ai) aiImage(c, plan, s, seed, src, pexels, used) else if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used)
-                if (b != null) shared[i] = b
+                if (ai && i > 0) { try { first.await(50, java.util.concurrent.TimeUnit.SECONDS) } catch (_: InterruptedException) {} }   // pehle scene ke baad baaki, taaki character same rahe
+                val b = try { if (ai) aiImage(c, plan, s, seed, src, pexels, used) else if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used) }
+                        finally { if (i == 0) first.countDown() }
+                if (b != null) { shared[i] = b; if (i == 0) refBmp = b }
                 b
             }
         }
@@ -168,6 +176,16 @@ object VideoGen {
             }
         }
         pool.shutdownNow()
+        // Jis scene ki image nahi aayi use ek-ek karke dobara banao (max 75 sec), taaki ek hi photo har scene mein na dikhe
+        if (ai) {
+            val retryEnd = System.currentTimeMillis() + 75_000L
+            for (i in plan.scenes.indices) {
+                if (shared[i] != null || System.currentTimeMillis() > retryEnd) continue
+                onStage("Scene ${i + 1} ki image dobara bana rahi hoon…")
+                val b = try { aiImage(c, plan, plan.scenes[i], seed + 7 * i, src, pexels, used) } catch (_: Exception) { null }
+                if (b != null) shared[i] = b
+            }
+        }
         val bmps: List<Bitmap?> = fillGaps(ArrayList(shared))
         onStage("Video encode ho rahi hai…")
         val visualsTxt = if (bmps.any { it != null }) (if (ai) "AI images" else "photos") else (if (ai) "neon (AI image nahi bani: $imgErr)" else "neon animated")
@@ -209,7 +227,7 @@ Make a CINEMATIC STORY style short video (like a viral AI-generated story reel w
 Make exactly $n scenes of about 5 seconds each, about $words words of narration in total.
 $langRule
 "character" = ONE detailed English visual description of the main character(s), identical in every scene (species/age/clothes/colours/accessories, e.g. "a cute white lion cub wearing a white linen shirt and a thin gold chain"). Use "" if there is no character.
-Each scene "image" = a detailed English prompt for a PHOTOREALISTIC cinematic still: camera angle, location, lighting, what the character is doing. Vary the shots (wide, close-up, over-the-shoulder, aerial). Always mention the character. No text, logos or captions inside the image.
+Each scene "image" = a detailed English prompt for a PHOTOREALISTIC cinematic still: camera angle, location, lighting, what the character is doing. Every scene must be a clearly DIFFERENT location or camera angle (wide, close-up, over-the-shoulder, aerial, low angle) with real-looking details (props, background, time of day) - never repeat the same shot. Always mention the character. No text, logos or captions inside the image.
 Scene 1 = strong hook. Last scene = short ending / follow-like call to action.
 JSON format: {"title":"short title (max 6 words)","character":"...","scenes":[{"speak":"...","caption":"...","image":"..."}]}""" else """Topic: $topic
 Style: ${style.ifBlank { "facts" }}
@@ -246,16 +264,16 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
     private fun buildPrompt(ch: String, s: Scene): String {
         val base = s.img.ifBlank { s.query }
         val withCh = if (ch.isNotBlank() && !base.contains(ch.take(18), true)) "$base, $ch" else base
-        return (withCh + ", photorealistic cinematic still, ultra detailed, natural lighting, sharp focus, 9:16 vertical, no text, no watermark").take(900)
+        return (withCh + ", hyper-realistic cinematic film still, shot on ARRI Alexa 35mm lens, shallow depth of field, real skin/fur/fabric texture, natural volumetric light, ultra detailed 8k, sharp focus, 9:16 vertical, no text, no logo, no watermark, not a cartoon, not CGI-looking").take(900)
     }
 
     /** Auto: Pollinations (free, bina key) -> Gemini image (aapki key) -> Pexels photo. */
     private fun aiImage(c: Context, plan: Plan, s: Scene, seed: Int, src: String, pexels: String, used: MutableSet<Long>): Bitmap? {
         val prompt = buildPrompt(plan.character, s)
-        val order = when (src) { "pollinations" -> listOf("p"); "gemini" -> listOf("g"); "pexels" -> listOf("x"); else -> listOf("p", "g", "x") }
+        val order = when (src) { "pollinations" -> listOf("p"); "gemini" -> listOf("g"); "pexels" -> listOf("x"); else -> if (!gDead && (c.getSharedPreferences("divya", 0).getString("key", "") ?: "").isNotBlank()) listOf("g", "p", "x") else listOf("p", "x") }
         for (o in order) {
             val b = try {
-                when (o) { "p" -> pollinations(prompt, seed, c.getSharedPreferences("divya", 0).getString("vgModel", "turbo") ?: "turbo"); "g" -> geminiImage(c, prompt); else -> if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used) }
+                when (o) { "p" -> pollinations(prompt, seed, c.getSharedPreferences("divya", 0).getString("vgModel", "flux") ?: "flux"); "g" -> geminiImage(c, prompt, refBmp.takeIf { s !== plan.scenes.firstOrNull() }); else -> if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used) }
             } catch (e: Exception) { imgErr = "$o: ${e.message}"; Log.w(TAG, "image $o: ${e.message}"); null }
             if (b != null) return b
         }
@@ -264,29 +282,39 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
 
     /** SPEED: video 576x1024 par encode hoti hai, isliye image bhi utni hi maango (720x1280 bekaar mein slow thi).
      *  Model "turbo" = bahut tez (2-5 sec); "flux" = behtar quality par slow. Pref "vgModel" se badlo. */
-    private fun pollinations(prompt: String, seed: Int, model: String = "turbo"): Bitmap? {
-        for (attempt in 0..1) {
+    private fun pollinations(prompt: String, seed: Int, model: String = "flux"): Bitmap? {
+        for (attempt in 0..2) {
             val url = "https://image.pollinations.ai/prompt/" + java.net.URLEncoder.encode(prompt, "UTF-8").replace("+", "%20") +
-                "?width=$W&height=$H&model=$model&nologo=true&seed=${seed + attempt}"
+                "?width=$IW&height=$IH&model=$model&nologo=true&enhance=false&seed=${seed + attempt}"
             val bytes = imgHttp.newCall(Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 DivyaAI").build()).execute().use { r ->
-                if (!r.isSuccessful) { imgErr = "pollinations ${r.code}"; null } else r.body?.bytes()
+                if (!r.isSuccessful) { imgErr = "pollinations ${r.code}"; if (r.code == 429 || r.code >= 500) try { Thread.sleep(2500L * (attempt + 1)) } catch (_: InterruptedException) {}; null } else r.body?.bytes()
             }
-            if (bytes != null && bytes.size > 5000) decodeBmp(bytes)?.let { return it }
+            if (bytes != null && bytes.size > 5000) decodeBmp(bytes)?.let { bm ->
+                // free server kabhi neeche kone mein "pollinations.ai" likh deta hai: neeche ka 6% kaat do
+                return try { Bitmap.createBitmap(bm, 0, 0, bm.width, (bm.height * 0.94f).toInt()) } catch (_: Exception) { bm }
+            }
         }
         return null
     }
 
-    private fun geminiImage(c: Context, prompt: String): Bitmap? {
+    private fun geminiImage(c: Context, prompt: String, ref: Bitmap? = null): Bitmap? {
         val pr = c.getSharedPreferences("divya", 0)
         val key = pr.getString("key", "") ?: ""; if (key.isBlank()) return null
         val model = pr.getString("imgModel", "gemini-2.5-flash-image") ?: "gemini-2.5-flash-image"
+        val parts0 = JSONArray()
+        if (ref != null && !ref.isRecycled) {
+            val bo = java.io.ByteArrayOutputStream()
+            Bitmap.createScaledBitmap(ref, ref.width * 640 / ref.height, 640, true).compress(Bitmap.CompressFormat.JPEG, 85, bo)
+            parts0.put(JSONObject().put("inlineData", JSONObject().put("mimeType", "image/jpeg").put("data", android.util.Base64.encodeToString(bo.toByteArray(), android.util.Base64.NO_WRAP))))
+            parts0.put(JSONObject().put("text", "Keep EXACTLY the same character(s), face, fur/skin, clothes and art style as the reference image, but make a NEW different shot: $prompt"))
+        } else parts0.put(JSONObject().put("text", prompt))
         val body = JSONObject()
-            .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", prompt)))))
+            .put("contents", JSONArray().put(JSONObject().put("parts", parts0)))
             .put("generationConfig", JSONObject().put("responseModalities", JSONArray().put("IMAGE")).put("imageConfig", JSONObject().put("aspectRatio", "9:16")))
             .toString()
         val req = Request.Builder().url("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent").header("x-goog-api-key", key)
             .post(body.toRequestBody("application/json".toMediaType())).build()
-        val txt = imgHttp.newCall(req).execute().use { r -> if (!r.isSuccessful) { imgErr = "gemini ${r.code}"; null } else r.body?.string() } ?: return null
+        val txt = imgHttp.newCall(req).execute().use { r -> if (!r.isSuccessful) { imgErr = "gemini ${r.code}"; if (r.code == 403 || r.code == 429 || r.code == 404) gDead = true; null } else r.body?.string() } ?: return null
         val parts = JSONObject(txt).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: return null
         for (i in 0 until parts.length()) {
             val d = parts.getJSONObject(i).optJSONObject("inlineData")?.optString("data")
@@ -499,7 +527,7 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
                             totalSec: Double, out: File, progress: (Float) -> Unit) {
         val fmt = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, W, H).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, 2_000_000); setInteger(MediaFormat.KEY_FRAME_RATE, FPS); setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+            setInteger(MediaFormat.KEY_BIT_RATE, 6_000_000); setInteger(MediaFormat.KEY_FRAME_RATE, FPS); setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }
         val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
         codec.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
@@ -586,9 +614,9 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
             // is scene ki image abhi na aayi ho to pichhli scene ki image dikhao (neon sirf tab jab koi bhi image nahi)
             val bmp = (si downTo 0).firstNotNullOfOrNull { k -> bmps[k]?.takeIf { !it.isRecycled } }
             if (bmp != null) drawPhoto(cv, bmp, prog, si) else drawNeon(cv, t.toFloat(), si)
-            if (bmp != null && si + 1 < bmps.size && dur - local < 0.4) { // crossfade agle scene ki image mein
+            if (bmp != null && si + 1 < bmps.size && dur - local < 0.5) { // crossfade agle scene ki image mein
                 val nb = bmps[si + 1]
-                if (nb != null && nb !== bmp) { p.alpha = (255 * (1 - (dur - local) / 0.4)).toInt().coerceIn(0, 255); drawPhoto(cv, nb, 0f, si + 1); p.alpha = 255 }
+                if (nb != null && nb !== bmp) { p.alpha = (255 * (1 - (dur - local) / 0.5)).toInt().coerceIn(0, 255); drawPhoto(cv, nb, 0f, si + 1); p.alpha = 255 }
             }
             p.shader = grad; cv.drawRect(0f, DH * 0.5f, DW.toFloat(), DH.toFloat(), p)
             p.shader = gradTop; cv.drawRect(0f, 0f, DW.toFloat(), DH * 0.2f, p); p.shader = null
@@ -628,12 +656,16 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
             val target = DW.toFloat() / DH
             var cw = b.width.toFloat(); var chh = cw / target
             if (chh > b.height) { chh = b.height.toFloat(); cw = chh * target }
-            val pz = if (si % 2 == 0) prog else 1f - prog
-            val zoom = 1f + 0.18f * pz
+            val e = prog * prog * (3f - 2f * prog)                 // ease in-out
+            val mv = si % 4                                        // har scene mein alag camera move: push-in, pan, pull-out, tilt
+            val zoom = when (mv) { 0 -> 1.04f + 0.20f * e; 1 -> 1.14f; 2 -> 1.24f - 0.20f * e; else -> 1.14f }
             val vw = cw / zoom; val vh = chh / zoom
-            val dir = if (si % 2 == 0) 1f else -1f
-            val cx = b.width / 2f + dir * (cw - vw) * (pz - 0.5f) * 0.8f
-            val cy = b.height / 2f
+            val maxX = (b.width - vw) / 2f; val maxY = (b.height - vh) / 2f
+            val px = when (mv) { 1 -> maxX * (1f - 2f * e); 3 -> maxX * (2f * e - 1f); else -> 0f }
+            val py = when (mv) { 3 -> maxY * (0.6f - 1.2f * e); 0 -> -maxY * 0.15f * e; else -> 0f }
+            val t = prog * 7f + si                                 // halka handheld hilna: camera asli lagta hai
+            val cx = b.width / 2f + px + sin(t * 2.3f) * vw * 0.004f
+            val cy = b.height / 2f + py + cos(t * 1.9f) * vh * 0.004f
             val src = Rect((cx - vw / 2).toInt().coerceIn(0, b.width - 1), (cy - vh / 2).toInt().coerceIn(0, b.height - 1),
                 (cx + vw / 2).toInt().coerceIn(1, b.width), (cy + vh / 2).toInt().coerceIn(1, b.height))
             cv.drawBitmap(b, src, Rect(0, 0, DW.toInt(), DH.toInt()), p)

@@ -21,8 +21,9 @@ object VoicePrint {
     /** Itne bolne wale frames se kam ho to awaaz pakki nahi hoti. */
     const val MIN_VOICED = 30
     /** Limit kabhi bhi is se kam nahi hoga, chahe purani saved awaaz ka threshold kitna bhi chhota ho. */
-    const val MIN_LIMIT = 1.5
-    fun limit(md: VpModel, sens: Float): Double = max(md.thr * sens, MIN_LIMIT)
+    const val MIN_LIMIT = 2.6
+    /** Limit kabhi 2.6 se kam nahi; slider (sens 0.6..2.0) sirf 1.1x..1.8x ke beech badlata hai. Pehle 1.5 tak girta tha, isliye owner reject hota tha. */
+    fun limit(md: VpModel, sens: Float): Double = max(md.thr, MIN_LIMIT) * (0.8 + 0.5 * sens.coerceIn(0.6f, 2.0f))
 
     private val window = DoubleArray(FRAME) { 0.54 - 0.46 * cos(2 * PI * it / (FRAME - 1)) }
     private val melBank: Array<DoubleArray> = buildMel()
@@ -148,7 +149,19 @@ object VoicePrint {
         var i = 0
         while (i + WIN <= fr.size) { s.add(score(md, vector(fr.subList(i, i + WIN)))); i += WIN / 2 }
         s.sort()
-        return s[s.size / 2]
+        // Median nahi: achhe 30% windows ka score (khansi/shor wale kharab window owner ko reject na karein)
+        return s[(s.size * 0.3).toInt().coerceIn(0, s.size - 1)]
+    }
+
+    /** Owner pakka match ho to model ko uski aaj ki awaaz ki taraf thoda (3%) khiska do: jitna use karo utna behtar match. */
+    fun adapt(p: SharedPreferences, md: VpModel, fr: List<DoubleArray>) {
+        try {
+            if (fr.size < WIN) return
+            val v = vector(fr.subList(fr.size - WIN, fr.size))
+            if (v.size != md.m.size) return
+            val nm = DoubleArray(md.m.size) { md.m[it] * 0.97 + v[it] * 0.03 }
+            save(p, VpModel(nm, md.s, md.thr))
+        } catch (_: Exception) {}
     }
 
     fun train(c: List<DoubleArray>): VpModel? {

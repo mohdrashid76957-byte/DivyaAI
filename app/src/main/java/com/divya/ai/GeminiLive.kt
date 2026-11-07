@@ -24,7 +24,7 @@ class GeminiLive(
     private val onOpenCamera: () -> Unit = {}
 ) {
     private val main = Handler(Looper.getMainLooper())
-    private val http = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).connectTimeout(20, TimeUnit.SECONDS).pingInterval(0, TimeUnit.MILLISECONDS).retryOnConnectionFailure(true).build()
+    private val http = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).connectTimeout(40, TimeUnit.SECONDS).pingInterval(25, TimeUnit.SECONDS).retryOnConnectionFailure(true).build()
     private var ws: WebSocket? = null
     private var rec: AudioRecord? = null
     private var track: AudioTrack? = null
@@ -38,6 +38,14 @@ class GeminiLive(
     private var pending: String? = null
     private var mic = true
     private var newTurn = true
+    @Volatile private var slowNet = false          // internet slow ho to timeouts lamba, audio buffer bada, extra downloads band
+    private var netRetries = 0
+    private var startedAt = 0L
+    private fun detectSlow(): Boolean = try {
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val nc = cm.getNetworkCapabilities(cm.activeNetwork)
+        nc == null || nc.linkDownstreamBandwidthKbps in 1..2500 || nc.linkUpstreamBandwidthKbps in 1..600
+    } catch (_: Throwable) { false }
     @Volatile var running = false
     @Volatile var ready = false            // setupComplete aane ke baad hi frames/audio bhejo
     @Volatile var micOn = false
@@ -78,7 +86,12 @@ class GeminiLive(
         sh
     }
     /** Kaun bol raha hai (Voice Guardian). OFF ho ya awaaz na mile (typed chat) to allow. */
-    private fun voiceId(): VoiceGuardian.Speaker? = VoiceGuardian.identify(ctx, ringSnapshot())
+    private fun voiceId(): VoiceGuardian.Speaker? {
+        // Mic gate chal raha ho to Gemini tak sirf verified awaaz pahunchi hai; ring buffer mein khamoshi (zeros) bhari hoti hai,
+        // isliye dobara check karne par owner ko bhi "voice lock ne rok diya" aata tha. Isliye yahan dobara check nahi.
+        val gated = try { MicGate(ctx).active() } catch (_: Throwable) { false }
+        return if (gated) null else VoiceGuardian.identify(ctx, ringSnapshot())
+    }
 
     private fun gfPrompt() = "PERSONALITY: You are ${callName}'s sweet, loving girlfriend-style companion. Talk warmly, softly and playfully in Hinglish, like a close girlfriend: " +
         "use pet names (jaan, babu, baby, shona) naturally, and when he calls you baby/babu/jaan answer back with the same affection. " +
@@ -94,7 +107,7 @@ class GeminiLive(
         "If you cannot see a clear frame, say so and ask him to hold the camera steady or move closer. If he asks you to look/scan/dekho and the camera is not open yet, call open_camera first. Never pretend to see something you do not. " +
         "If he sincerely asks whether you are a human, say honestly that you are an AI. Keep replies very short. SPEED RULES for phone tasks: never narrate steps, never ask permission, act immediately. " +
         "Prefer ONE do_steps call with the whole sequence (open_app, tap, type, submit, scroll_down, wait...). " +
-        "To play a song or video on YouTube ALWAYS call play_youtube(query) - it searches and plays by itself. If a step fails or you are unsure what is on screen, call read_screen, then continue. Speak only once at the end, in a few words. " +
+        "To play a song or video on YouTube ALWAYS call play_youtube(query) - it searches and plays by itself. Say it is playing ONLY if the result starts with "done"; if it says failed or done?, call read_screen and fix it (tap the video / play button) before telling him, never claim it is playing otherwise. If a step fails or you are unsure what is on screen, call read_screen, then continue. Speak only once at the end, in a few words. " +
         "STOP: if the user tells you to go off / stop / sleep / be quiet (off ho jao, band ho jao, so jao, bas, chup, bye) call end_session at once and say only a 2-3 word goodbye. " +
         "WHATSAPP: to send a WhatsApp message call whatsapp_message(person, message) - never do it with do_steps. Use the contact name as the user said it (ammi, papa, etc). If it fails with contact not found, ask him for the exact contact name. " +
         "INSTAGRAM: to message someone on Instagram call instagram_message(person, message) with the exact name and the exact words the user dictated (fix only obvious speech-to-text slips). If he did not say what to write, ask once. " +
@@ -189,7 +202,8 @@ class GeminiLive(
         nativeSearch = ctx.getSharedPreferences("divya", 0).getBoolean("nativeSearchOn", false)   // experimental, default OFF
         ready = false; running = true; endAfter = false; heard.setLength(0); WakeBus.liveActive = true; lastAct = System.currentTimeMillis(); mic = withMic; pending = firstText; newTurn = true
         state("Connecting…")
-        PhoneTools.prefetchNews(ctx)
+        startedAt = System.currentTimeMillis(); slowNet = detectSlow()
+        if (!slowNet) PhoneTools.prefetchNews(ctx)      // slow net par extra download connect ko na roke
         updateGlow()
         // Background mein bhi mic/session zinda rahe (Android background mein mic band kar deta hai, foreground service se nahi)
         if (micOk(ctx)) LiveKeepService.start(ctx)
@@ -224,6 +238,14 @@ class GeminiLive(
                 start(lastKey, lastModel, lastVoice, mic, pending)
                 return
             }
+        }
+        // Internet atakne / slow hone par socket toot jaye to har baar band mat karo: 3 baar dheere-dheere dobara jodo
+        if (running && code != 1000 && netRetries < 3 && (code == -1 || code == 1006 || code == 1001)) {
+            netRetries++; slowNet = true
+            val d = 1200L * netRetries
+            stop("Net slow hai, dobara jud rahi hoon…")
+            main.postDelayed({ if (!running) start(lastKey, lastModel, lastVoice, mic, pending) }, d)
+            return
         }
         stop(msg)
     }
@@ -265,7 +287,7 @@ class GeminiLive(
 
     private fun armWatchdog(text: String?) {
         val mark = System.currentTimeMillis(); awaitAt = mark
-        main.postDelayed({ if (running && ready && awaitAt == mark) onSilent(text) }, 11_000)
+        main.postDelayed({ if (running && ready && awaitAt == mark) onSilent(text) }, if (slowNet) 28_000L else 11_000L)
     }
 
     private fun onSilent(text: String?) {
@@ -302,7 +324,8 @@ class GeminiLive(
         try {
             val j = JSONObject(s)
             if (j.has("setupComplete")) {
-                ready = true
+                ready = true; netRetries = 0
+                if (System.currentTimeMillis() - startedAt > 4000) slowNet = true
                 state(if (mic) "Listening…" else "Connected")
                 initAudio(); pending?.let { sendText(it) }; pending = null
                 if (mic) startMic()
@@ -476,8 +499,8 @@ class GeminiLive(
         val b = AudioTrack.Builder()
             .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
             .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(24000).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-            .setBufferSizeInBytes(min * 2).setTransferMode(AudioTrack.MODE_STREAM)
-        if (Build.VERSION.SDK_INT >= 26) b.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)   // kam delay
+            .setBufferSizeInBytes(min * (if (slowNet) 6 else 2)).setTransferMode(AudioTrack.MODE_STREAM)
+        if (Build.VERSION.SDK_INT >= 26 && !slowNet) b.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)   // kam delay
         return b.build().also { it.play() }
     }
 
@@ -625,7 +648,9 @@ class GeminiLive(
                 var gateOn = false; var gateChk = 0L
                 val sbuf = ShortArray(800); var sfill = 0
                 fun sendAudio(b: ByteArray, n: Int) {
-                    ws?.send("""{"realtimeInput":{"audio":{"mimeType":"audio/pcm;rate=16000","data":"${Base64.encodeToString(b, 0, n, Base64.NO_WRAP)}"}}}""")
+                    val w0 = ws ?: return
+                    if (w0.queueSize() > 96_000L) return          // ~3 sec ka backlog: slow net par purani awaaz skip, taaki jawab late na ho
+                    w0.send("""{"realtimeInput":{"audio":{"mimeType":"audio/pcm;rate=16000","data":"${Base64.encodeToString(b, 0, n, Base64.NO_WRAP)}"}}}""")
                 }
                 while (running && micOn) {
                     if (idleStopMs > 0 && System.currentTimeMillis() - lastAct > idleStopMs) { main.post { stop() }; break }
