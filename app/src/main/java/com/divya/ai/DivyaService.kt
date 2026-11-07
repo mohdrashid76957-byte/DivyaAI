@@ -161,21 +161,68 @@ class DivyaService : AccessibilityService() {
         return null
     }
 
-    private fun setIn(n: AccessibilityNodeInfo, t: String): Boolean {
+    @Volatile private var lastTyped: AccessibilityNodeInfo? = null
+
+    private fun textOf(n: AccessibilityNodeInfo): String = try { n.refresh(); n.text?.toString().orEmpty() } catch (_: Exception) { "" }
+    private fun hasText(n: AccessibilityNodeInfo, t: String): Boolean {
+        val cur = textOf(n).lowercase(); val k = t.trim().take(15).lowercase()
+        return k.isNotEmpty() && cur.contains(k)
+    }
+
+    /** Box mein text daalo: click (focus) -> fresh node -> SET_TEXT -> verify -> na bane to select-all + paste. Chrome/Instagram ke box pehle click par badal jaate hain, isliye node dobara dhundte hain. */
+    private fun setIn(n0: AccessibilityNodeInfo, t: String): Boolean {
+        var n = n0
+        n.performAction(AccessibilityNodeInfo.ACTION_CLICK); nap(220)
+        currentInput()?.let { n = it }
         n.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
         val b = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, t) }
-        if (n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b)) return true
-        // Backup: clipboard se paste
-        return try {
+        val setOk = n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b)
+        nap(120)
+        if (setOk && hasText(n, t)) { lastTyped = n; return true }
+        // Backup: clipboard se (purana text select karke) paste
+        val pasted = try {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("divya", t))
             n.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+            val sel = Bundle().apply { putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0); putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, textOf(n).length) }
+            n.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, sel)
             n.performAction(AccessibilityNodeInfo.ACTION_PASTE)
         } catch (_: Exception) { false }
+        nap(150)
+        lastTyped = n
+        return pasted || setOk
     }
 
-    /** Focused / pehle input box mein likho. Box na dikhe to "Search" wala box dabake dobara dhundta hai; set-text na chale to paste. */
+    private val termuxPkg = "com.termux"
+
+    private fun longPressAt(x: Float, y: Float): Boolean {
+        val p = Path().apply { moveTo(x, y) }
+        return dispatchGesture(GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(p, 0, 900)).build(), null, null)
+    }
+
+    /** Termux ka terminal normal text-box nahi hota (SET_TEXT nahi chalta). 1) official RUN_COMMAND (visible window) 2) clipboard + long-press > Paste (newline = Enter). Safety filter dono mein lagta hai. */
+    fun termuxType(cmd: String): Boolean {
+        val c = cmd.trim(); if (c.isBlank()) return false
+        if (Termux.danger(c) != null) return false
+        if (Termux.enabled(this) && Termux.installed(this) && Termux.hasPerm(this)) {
+            if (Termux.run(this, c, true).startsWith("done")) return true
+        }
+        if (curPkg() != termuxPkg) { Termux.open(this); waitOpen(termuxPkg, 4000) }
+        try {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("divya", c + "\n"))
+        } catch (_: Exception) { return false }
+        val dm = resources.displayMetrics
+        longPressAt(dm.widthPixels / 2f, dm.heightPixels * 0.35f)
+        nap(900)
+        val hit = tapAnyExact(listOf("Paste", "PASTE", "चिपकाएं"), 2500)
+        nap(300)
+        return hit != null
+    }
+
+    /** Focused / pehle input box mein likho. Termux mein terminal par paste. Box na dikhe to \"Search\" wala box dabake dobara dhundta hai. */
     fun typeText(t: String): Boolean {
+        if (curPkg() == termuxPkg) return termuxType(t)
         val end = SystemClock.uptimeMillis() + 3500
         var node: AccessibilityNodeInfo? = null
         var triedSearch = false
@@ -190,18 +237,22 @@ class DivyaService : AccessibilityService() {
         }
         val n = node ?: return false
         if (setIn(n, t)) return true
-        // box dabake dobara (kuch apps pehle click par asli input kholte hain)
         clickOrTap(n); nap(450)
         val m = currentInput() ?: return false
         return setIn(m, t)
     }
 
-    /** Enter / Search / Send dabana. */
+    /** Enter / Search / Go / Send dabana: pehle jo box abhi bhara tha usi par IME-Enter, phir focused box, phir button. */
     fun submit(): Boolean {
-        val f = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        if (f != null && Build.VERSION.SDK_INT >= 30 &&
-            f.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)) return true
-        return tapText("Search", 600) || tapText("Send", 600)
+        if (curPkg() == termuxPkg) return true   // paste ke saath Enter ja chuka
+        val cands = ArrayList<AccessibilityNodeInfo>()
+        lastTyped?.let { try { it.refresh(); cands.add(it) } catch (_: Exception) {} }
+        try { rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.let { cands.add(it) } } catch (_: Exception) {}
+        if (Build.VERSION.SDK_INT >= 30) for (f in cands) {
+            f.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+            if (f.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)) return true
+        }
+        return tapText("Search", 500) || tapDesc("Search", 300) || tapText("Go", 400) || tapText("Send", 500) || tapDesc("Send", 300)
     }
 
     fun scroll(dir: String): Boolean {
@@ -424,23 +475,42 @@ class DivyaService : AccessibilityService() {
         }
     }
 
-    /** Instagram DM: app kholo -> messages -> search -> naam -> message type -> send. (Instagram ke update se UI badle to adjust karna pad sakta hai.) */
+    /** Instagram DM: seedha inbox deep-link -> search -> naam -> message -> Send (verify ke saath). UI badle to adjust karna pad sakta hai. */
     fun instagramDm(person: String, message: String): String {
         val ig = "com.instagram.android"
         val l = packageManager.getLaunchIntentForPackage(ig) ?: return "failed: Instagram installed nahi hai"
-        startActivity(l.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); waitOpen(ig, 4000)
-        if (!(tapDesc("Messenger", 1500) || tapDesc("Message", 600) || tapDesc("Direct", 600) || tapText("Messages", 600)))
-            return "failed: message icon nahi mila. Screen: " + readScreen(700)
-        nap(500)
-        if (!tapText("Search", 1500)) return "failed: DM search bar nahi mila. Screen: " + readScreen(700)
-        if (!typeText(person)) return "failed: naam type nahi hua"
-        nap(900)
-        if (!tapResult(person, 3000)) return "failed: '$person' search mein nahi mila. Screen: " + readScreen(700)
-        nap(700)
+        // 1) inbox seedha kholo (icon dhundne se zyada pakka); na chale to app kholke icon dabao
+        var inbox = false
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("instagram://direct_inbox")).setPackage(ig).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            waitOpen(ig, 4500); nap(1200); inbox = readScreen(600).contains("Search", true) || readScreen(600).contains("Message", true)
+        } catch (_: Exception) {}
+        if (!inbox) {
+            startActivity(l.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); waitOpen(ig, 4500); nap(800)
+            if (!(tapDesc("Messenger", 1500) || tapDesc("Message", 600) || tapDesc("Direct", 600) || tapText("Messages", 600)))
+                return "failed: message icon nahi mila (Instagram login hai?). Screen: " + readScreen(700)
+            nap(900)
+        }
+        // 2) search
+        if (!(tapText("Search", 1800) || tapDesc("Search", 600))) return "failed: DM search bar nahi mila. Screen: " + readScreen(700)
+        nap(300)
+        if (!typeText(person)) return "failed: naam type nahi hua. Screen: " + readScreen(500)
+        nap(1100)
+        // 3) naam chuno (poora naam, na mile to pehla shabd)
+        if (!tapResult(person, 3000) && !tapResult(person.trim().split(" ").first(), 1500)) return "failed: '$person' search mein nahi mila. Screen: " + readScreen(700)
+        nap(1100)
+        // 4) message likho
         if (!typeText(message)) return "failed: message box nahi mila. Screen: " + readScreen(700)
-        nap(250)
-        if (!(tapDesc("Send", 1500) || tapText("Send", 800))) return "failed: Send button nahi mila"
-        return "done: Instagram par $person ko message bhej diya"
+        nap(400)
+        // 5) Send (Instagram ka Send icon text likhne ke baad aata hai) - 3 koshish
+        var sent = false
+        for (k in 0 until 3) { if (tapDesc("Send", 1200) || tapText("Send", 600)) { sent = true; break }; nap(500) }
+        if (!sent) return "failed: Send button nahi mila. Screen: " + readScreen(500)
+        nap(900)
+        val after = readScreen(900)
+        val stillInBox = currentInput()?.let { textOf(it).contains(message.trim().take(15), true) } == true
+        return if (stillInBox) "failed: message box mein reh gaya, bheja nahi gaya. Screen: " + after.take(400)
+        else "done: Instagram par $person ko message bhej diya"
     }
 
     private val shotExec = java.util.concurrent.Executors.newSingleThreadExecutor()

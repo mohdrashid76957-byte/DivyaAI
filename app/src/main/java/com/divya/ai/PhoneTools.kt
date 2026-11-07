@@ -166,6 +166,16 @@ object PhoneTools {
         return keep(d)
     }
 
+    /** Chrome mein seedha search ya link kholo (typing ki zaroorat nahi, isliye hamesha chalta hai). */
+    fun openInBrowser(c: Context, q: String): String {
+        val t = q.trim(); if (t.isBlank()) return "failed: kya search karna hai ya kaun si site kholni hai?"
+        val isUrl = !t.contains(' ') && Regex("^(https?://\\S+|www\\.\\S+|[\\w-]+(\\.[\\w-]+)+(/\\S*)?)$", RegexOption.IGNORE_CASE).matches(t)
+        val url = if (isUrl) (if (t.startsWith("http", true)) t else "https://$t") else "https://www.google.com/search?q=" + Uri.encode(t)
+        val i = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        if (appThere(c, "com.android.chrome")) i.setPackage("com.android.chrome")
+        return if (launch(c, i)) "done: Chrome mein ${if (isUrl) "site" else "'$t' ka search"} khul gaya" else "failed: browser nahi khula"
+    }
+
     /** Google search ke nateeje screen par dikhao (Google app / browser mein). */
     fun openGoogle(c: Context, query: String): String {
         if (query.isBlank()) return "failed: kya search karna hai?"
