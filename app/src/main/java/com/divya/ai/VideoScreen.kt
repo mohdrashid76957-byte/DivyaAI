@@ -5,6 +5,7 @@ import android.content.Intent
 import android.widget.MediaController
 import android.widget.Toast
 import android.widget.VideoView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,7 +33,7 @@ fun VideoGenScreen(th: UiTheme, ctx: Context) {
     var tab by remember { mutableStateOf(0) }
     var topic by remember { mutableStateOf("") }
     var lang by remember { mutableStateOf(prefs.getString("vgLang", "hindi") ?: "hindi") }
-    var secs by remember { mutableStateOf(prefs.getInt("vgSecs", 30)) }
+    var secs by remember { mutableStateOf(prefs.getInt("vgSecs", 15)) }
     var style by remember { mutableStateOf(prefs.getString("vgStyle", "facts") ?: "facts") }
     var sel by remember { mutableStateOf(VideoBus.lastPath) }
     var tick by remember { mutableStateOf(0) }
@@ -68,6 +71,18 @@ fun VideoGenScreen(th: UiTheme, ctx: Context) {
         }
     }
 
+    @Composable fun LivePreview(live: VideoGen.Live) {
+        var frame by remember { mutableStateOf(0L) }
+        LaunchedEffect(live) { while (true) { withFrameNanos { frame = it } } }
+        Canvas(Modifier.height(460.dp).aspectRatio(9f / 16f).clip(RoundedCornerShape(14.dp))) {
+            frame.let { }
+            drawIntoCanvas { c ->
+                val t = ((System.nanoTime() - live.startNs) / 1e9).coerceIn(0.0, live.total - 0.05)
+                live.renderer.draw(c.nativeCanvas, t, size.width, size.height)
+            }
+        }
+    }
+
     Page(th, "🎬 Video Gen AI") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("CREATE", "VIDEOS", "SETTINGS").forEachIndexed { i, l ->
@@ -88,6 +103,7 @@ fun VideoGenScreen(th: UiTheme, ctx: Context) {
                 Text("Style", color = th.text.copy(alpha = 0.7f), fontSize = 12.sp)
                 Chips(listOf("facts" to "Facts", "motivation" to "Motivation", "story" to "Story", "news" to "News"), style) { style = it; prefs.edit().putString("vgStyle", it).apply() }
 
+                VideoBus.live?.let { LivePreview(it) }
                 if (VideoBus.busy) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         CircularProgressIndicator(color = th.accent, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
@@ -108,7 +124,7 @@ fun VideoGenScreen(th: UiTheme, ctx: Context) {
                 val cur = sel?.let { File(it) }?.takeIf { it.exists() }
                 if (cur != null) {
                     Text("RESULT", color = th.accent, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                    Player(cur.absolutePath)
+                    if (VideoBus.live == null) Player(cur.absolutePath)
                     Text(cur.name, color = th.text.copy(alpha = 0.6f), fontSize = 11.sp)
                     Btn(th, "📤 Share") { share(cur) }
                     Btn(th, "🖼 Gallery mein save (Movies/DivyaVideos)") {

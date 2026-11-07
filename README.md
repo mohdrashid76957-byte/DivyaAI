@@ -443,4 +443,11 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - **Save:** app folder `Android/data/com.divya.ai/files/Movies/` + Android 10+ par Gallery `Movies/DivyaVideos`.
 - Hindi awaaz ke liye phone mein Google Text-to-speech ki Hindi voice download honi chahiye (Settings > Text-to-speech).
 - Naye files: `VideoGen.kt` (engine), `VideoScreen.kt` (UI). Badle: `GeminiLive.kt` (tool + prompt), `MainActivity.kt`, `NeonHome.kt`, `VoiceGuardian.kt` (make_video safe list), `CodeGen.kt` (`ask` internal), `file_paths.xml`.
+- **v2.23.0 speed:** 576x1024 @15fps, saari awaaz ek saath queue, audio+video parallel encode, default 15 sec (target ~10-20 sec total). Logcat tag `DivyaVideoGen` "video ready in Xs".
 - **Compile aur phone par test nahi hua** (yahan Android SDK nahi tha). Build error aaye to error ki line bhej do. Agla step: Series (auto daily videos), Post to Instagram/YouTube, AI-generated images.
+
+## v2.23.2 - INSTANT video (live preview)
+- Divya ab script khud likh kar `make_video(topic, script, captions)` ko deti hai (alag Gemini call nahi -> 2-5 sec bache). Script `scene1 | scene2 | scene3` format mein.
+- Awaaz bante hi video **turant screen par live chalne lagti hai** (Canvas live render + awaaz); mp4 export peeche background mein hoti hai aur ready hone par player + Share aa jata hai.
+- Pexels photos ke liye sirf 1.5 sec intezaar (nahi aayi to neon background), taaki start na ruke.
+- Screen se typed topic dene par script ke liye Gemini call hoti hai (2-5 sec extra); voice se bolne par nahi.
