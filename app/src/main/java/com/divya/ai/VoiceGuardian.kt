@@ -56,7 +56,7 @@ object VoiceGuardian {
     var last by mutableStateOf<Speaker?>(null)
 
     /** Ye tools "privileged" nahi hain (sirf code/website banane wale), baaki sab device-control/camera/screen/notification hain. */
-    private val SAFE = setOf("list_projects", "list_schedules", "preview_website", "build_website", "build_project", "edit_website", "generate_code", "end_session", "web_search", "get_weather", "open_google_search")
+    private val SAFE = setOf("list_projects", "list_schedules", "preview_website", "build_website", "build_project", "make_video", "edit_website", "generate_code", "end_session", "web_search", "get_weather", "open_google_search")
 
     private fun enc(md: VpModel) = md.m.joinToString(",") + "|" + md.s.joinToString(",") + "|" + md.thr
     private fun dec(s: String): VpModel? = try {

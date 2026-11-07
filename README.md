@@ -434,3 +434,13 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - Zaroori ek baar: Divya > Kali Launcher screen > "🏠 Phone Home banao" (ya Kali Home ke upar gear menu > Default Home chuno) > "Divya AI (Kali Home)" chuno.
 - Limit: Android normal app ko vivo launcher ke icons badalne nahi deta, isliye Divya khud launcher banti hai. Purana launcher wapas chahiye to Phone Settings > Default apps > Home app.
 - Icon par long press: App info / Uninstall.
+
+## v2.23.0 - Video Gen AI (Jarvis jaisa: topic bolo, voiceover wali video)
+- **Voice se:** "Divya, black hole par 30 second ki Hindi video bana do" -> tool `make_video` (background mein chalta hai, Divya baat karti rehti hai; ho jaane par Video Gen screen khud khulti hai).
+- **Screen:** Home par "Video Gen AI" tile ya Tools > "🎬 Video Gen AI". Tabs: CREATE (topic, Hindi/English, 15/30/45 sec, style Facts/Motivation/Story/News, player, Share, Gallery save), VIDEOS (purani videos: play/share/delete), SETTINGS (Pexels key).
+- **Kaise banti hai (sab phone par, extra library nahi):** Gemini script (scenes + hook + CTA) -> phone ka Google TTS Hindi/English awaaz -> subtitles (Hinglish, chhote chunks, pop animation) -> H.264 + AAC (`MediaCodec` + `MediaMuxer`) 720x1280 30fps mp4.
+- **Background visuals:** Settings tab mein free **Pexels key** daalo to har scene par asli portrait photo (Ken-Burns zoom). Key na ho to neon animated background (Jarvis ring + grid).
+- **Save:** app folder `Android/data/com.divya.ai/files/Movies/` + Android 10+ par Gallery `Movies/DivyaVideos`.
+- Hindi awaaz ke liye phone mein Google Text-to-speech ki Hindi voice download honi chahiye (Settings > Text-to-speech).
+- Naye files: `VideoGen.kt` (engine), `VideoScreen.kt` (UI). Badle: `GeminiLive.kt` (tool + prompt), `MainActivity.kt`, `NeonHome.kt`, `VoiceGuardian.kt` (make_video safe list), `CodeGen.kt` (`ask` internal), `file_paths.xml`.
+- **Compile aur phone par test nahi hua** (yahan Android SDK nahi tha). Build error aaye to error ki line bhej do. Agla step: Series (auto daily videos), Post to Instagram/YouTube, AI-generated images.

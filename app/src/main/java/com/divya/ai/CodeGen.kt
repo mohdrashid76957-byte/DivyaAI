@@ -25,7 +25,7 @@ object CodeGen {
     private fun model(c: Context) = ProEngine.fastModel(c)
 
     /** Gemini ko bhejo. Model busy (503/500/429) ya timeout ho to thoda ruk kar dobara, aur dusre model par bhi (max 6 koshish). Errors Hindi-English mein. */
-    private fun ask(c: Context, system: String, user: String): String {
+    internal fun ask(c: Context, system: String, user: String): String {
         val key = c.getSharedPreferences("divya", 0).getString("key", "") ?: ""
         if (key.isBlank()) throw GenError("Gemini API key nahi hai. Settings mein daalo.")
         val body = JSONObject()

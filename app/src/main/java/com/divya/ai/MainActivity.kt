@@ -59,7 +59,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
-enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, Journal, Study, Scan, About, Code, Preview, Guardian, Backup, ProChat, VoiceSettings, ManageApi, WakeWords, Termux }
+enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, Journal, Study, Scan, About, Code, Preview, Guardian, Backup, ProChat, VoiceSettings, ManageApi, WakeWords, Termux, VideoStudio }
 
 class UiTheme(
     val name: String, val img: Int, val circle: Boolean, val bg: Brush, val text: Color, val accent: Color,
@@ -303,6 +303,8 @@ fun DivyaApp(ctx: Context) {
     // App sach mein band ho (swipe/finish) to session aur glow saaf band karo, leak na ho
     DisposableEffect(Unit) { onDispose { if ((ctx as? android.app.Activity)?.isFinishing == true) { live.stop(); off.release() } } }
     // Divya ne voice se "preview dikhao" bola -> Preview screen
+    // Divya ne voice se video banayi -> Video Gen screen
+    LaunchedEffect(VideoBus.openTick) { if (VideoBus.openTick > 0) screen = Screen.VideoStudio }
     LaunchedEffect(CodeBus.previewTick) { if (CodeBus.previewTick > 0 && CodeBus.previewProject != null) screen = Screen.Preview }
 
     // System-wide neon glow (sab apps ke upar) jab Divya sun rahi ho
@@ -346,7 +348,7 @@ fun DivyaApp(ctx: Context) {
                 Screen.Journal -> JournalScreen(th, prefs)
                 Screen.Study -> StudyScreen(th)
                 Screen.Apps -> AppsScreen(th, ctx, prefs, { themeIdx = it; prefs.edit().putInt("theme2", it).apply() })
-                Screen.Quick -> QuickScreen(th, ctx, { screen = Screen.Scan }, { screen = Screen.Apps }) { screen = Screen.Code }
+                Screen.Quick -> QuickScreen(th, ctx, { screen = Screen.Scan }, { screen = Screen.Apps }, { screen = Screen.VideoStudio }) { screen = Screen.Code }
                 Screen.Code -> CodeScreen(th, ctx) { CodeBus.previewProject = it; CodeBus.previewTick++; screen = Screen.Preview }
                 Screen.Preview -> PreviewScreen(th, ctx, CodeBus.previewProject ?: "", CodeBus.previewTick) { screen = Screen.Code }
                 Screen.Scan -> ScanScreen(th, live, live.running, status, { if (!live.running) tapMic() }, { t -> sendChat(t) }) { screen = Screen.Home }
@@ -360,6 +362,7 @@ fun DivyaApp(ctx: Context) {
                 Screen.ManageApi -> ManageApiScreen(th, prefs)
                 Screen.WakeWords -> WakeWordsScreen(th, prefs)
                 Screen.Termux -> TermuxScreen(th, prefs)
+                Screen.VideoStudio -> VideoGenScreen(th, ctx)
                 Screen.Backup -> BackupScreen(th, ctx)
             } }
         }
@@ -517,7 +520,8 @@ fun ChatScreen(th: UiTheme, msgs: List<Pair<String, String>>, online: Boolean, s
 }
 
 @Composable
-fun QuickScreen(th: UiTheme, ctx: Context, openScan: () -> Unit = {}, openApps: () -> Unit = {}, openCode: () -> Unit = {}) = Page(th, "Quick Actions") {
+fun QuickScreen(th: UiTheme, ctx: Context, openScan: () -> Unit = {}, openApps: () -> Unit = {}, openVideo: () -> Unit = {}, openCode: () -> Unit = {}) = Page(th, "Quick Actions") {
+    Btn(th, "🎬 Video Gen AI (topic -> voiceover video)") { openVideo() }
     Btn(th, "🐉 Kali Apps Launcher + Theme + Wallpaper") { openApps() }
     Btn(th, "💻 Code & Website Builder") { openCode() }
     Btn(th, "📷 Scanner (Divya ko dikhao)") { openScan() }

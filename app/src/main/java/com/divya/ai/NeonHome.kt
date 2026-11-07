@@ -97,7 +97,7 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
         NeonTileData(Icons.Filled.Apps, "Kali Launcher", "Apps, Theme, Wallpaper", Color.White, false) { go(Screen.Apps) },
         NeonTileData(Icons.Filled.SmartToy, "AI Tools", "Image, Code, More…", blue, false) { go(Screen.Automate) },
         NeonTileData(Icons.Filled.GraphicEq, "Voice Changer", "Change Your Voice…", NeonPurple, false) { go(Screen.Settings) },
-        NeonTileData(Icons.Filled.Star, "Smart Features", "Explore More…", Color(0xFFFFC107), false) { go(Screen.Settings) },
+        NeonTileData(Icons.Filled.Star, "Video Gen AI", "Topic → Video in seconds", Color(0xFFFFC107), true) { go(Screen.VideoStudio) },
         NeonTileData(Icons.Filled.CleaningServices, "Files Cleaner", "Clean Junk Files…", blue, false) { cleaner() },
         NeonTileData(Icons.Filled.FlashOn, "Quick Actions", "Shortcuts for you…", Color(0xFFFFC107), false) { go(Screen.Quick) }
     )
