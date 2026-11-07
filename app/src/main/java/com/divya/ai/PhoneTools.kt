@@ -348,12 +348,48 @@ object PhoneTools {
         return Regex("/store/apps/details\\?id=([A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+)").find(html)?.groupValues?.get(1)
     }
 
+    @Volatile private var installing = false
+    @Volatile private var installCancelled = false
+    @Volatile private var lastInstallPkg: String? = null
+    @Volatile private var lastInstallAt = 0L
+
+    /** Kya abhi/haal mein (30 min) koi install chala tha jise cancel kiya ja sake? */
+    fun canCancelInstall(): Boolean = installing || (lastInstallPkg != null && System.currentTimeMillis() - lastInstallAt < 30 * 60_000)
+
+    /** Install rokta hai: polling band + Play Store mein chalta download "Cancel" karta hai. */
+    fun cancelInstall(c: Context): String {
+        installCancelled = true
+        val pkg = lastInstallPkg
+        lastInstallPkg = null
+        if (pkg == null || appThere(c, pkg)) return "done: koi chalta install nahi mila (ya app pehle se install hai)."
+        val svc = DivyaService.instance
+        if (svc == null) return "done: Divya ne install tracking band kar di. Accessibility OFF hai, isliye Play Store ka download khud Cancel karo."
+        Thread {
+            try {
+                launch(c, Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")).setPackage(PLAY))
+                svc.waitOpen(PLAY, 5000); SystemClock.sleep(1000)
+                // download chal raha ho to Cancel dabao; confirm dialog aaye to usse bhi
+                val hit = svc.tapAnyExact(listOf("Cancel", "CANCEL", "रद्द करें", "Stop"), 4000)
+                if (hit != null) { SystemClock.sleep(600); svc.tapAnyExact(listOf("Cancel download", "OK", "Yes"), 1500) }
+            } catch (_: Exception) {}
+        }.start()
+        return "done: install cancel kar diya, Play Store mein download rok rahi hoon."
+    }
+
     /** Play Store khol kar app install karo. Lamba kaam: background thread par chalao. */
     fun installApp(c: Context, name: String): String {
         if (name.isBlank()) return "failed: kaun si app install karni hai?"
         val svc = DivyaService.instance ?: return "failed: Accessibility ON nahi hai (Settings > Permissions)"
         if (!appThere(c, PLAY)) return "failed: is phone mein Play Store nahi mila"
+        if (installing) return "partial: ek install pehle se chal raha hai. Dobara install_app mat chalao; rokna ho to cancel_install chalao."
+        installing = true; installCancelled = false
+        try { return installInner(c, name, svc) } finally { installing = false }
+    }
+
+    private fun installInner(c: Context, name: String, svc: DivyaService): String {
+        BgTasks.stage("App dhoondh rahi hoon…")
         val pkg = resolvePackage(name)
+        if (installCancelled) return "done: install cancel ho gaya."
         if (pkg != null && appThere(c, pkg)) return "done: '$name' pehle se install hai (package $pkg). Chahe to open_app se khol sakti hoon."
         val i = if (pkg != null) Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg"))
         else Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=" + Uri.encode(name) + "&c=apps"))
@@ -363,7 +399,9 @@ object PhoneTools {
         SystemClock.sleep(1200)
         if (pkg == null) return "partial: Play Store mein '$name' ka search khul gaya par exact app pakka nahi hua. read_screen se results dekho, sahi app par tap_text karo, phir install_app dobara mat chalao - 'Install' par tap_text karo. Screen: " + svc.readScreen(500)
         val page = svc.readScreen(260)
-        val hit = svc.tapAnyExact(listOf("Install", "INSTALL", "इंस्टॉल करें", "Update"), 9000)
+        if (installCancelled) return "done: install cancel ho gaya, Install nahi dabaya."
+        // "Update" nahi dabate: wo purani app ko bina pooche update kar deta tha
+        val hit = svc.tapAnyExact(listOf("Install", "INSTALL", "इंस्टॉल करें"), 9000)
         if (hit == null) {
             val s = svc.readScreen(700)
             return when {
@@ -372,9 +410,12 @@ object PhoneTools {
                 else -> "failed: Install button nahi mila (app paid / is desh mein available nahi / Google account sign-in chahiye ho sakta hai). Page: $page"
             }
         }
-        // Download poora hone tak (max 8 min) dekhte raho
+        lastInstallPkg = pkg; lastInstallAt = System.currentTimeMillis()
+        BgTasks.stage("Download ho raha hai…")
+        // Download poora hone tak (max 8 min) dekhte raho; cancel milte hi nikal jao
         val end = SystemClock.uptimeMillis() + 8 * 60_000
         while (SystemClock.uptimeMillis() < end) {
+            if (installCancelled || BgTasks.isCancelled()) return "done: '$name' ka install cancel kar diya gaya."
             if (appThere(c, pkg)) return "done: '$name' install ho gayi ($pkg). User chahe to open_app se khol dein."
             nap(3000)
         }

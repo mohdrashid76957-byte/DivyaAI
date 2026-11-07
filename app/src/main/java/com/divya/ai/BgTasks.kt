@@ -5,6 +5,7 @@ import android.os.Looper
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +30,7 @@ object BgTasks {
     class T(val id: Int, val title: String) {
         var stage by mutableStateOf("Shuru…")
         var done by mutableStateOf(false)
+        @Volatile var cancelled = false
     }
     val tasks = mutableStateListOf<T>()
     var code by mutableStateOf("")
@@ -55,12 +57,17 @@ object BgTasks {
     }
 
     fun active() = tasks.any { !it.done }
+
+    /** User ne chip par X dabaya / "cancel" bola: sab chalte kaam ko cancel flag + chip hata do. */
+    fun cancelAll() { tasks.filter { !it.done }.forEach { it.cancelled = true; finish(it) } }
+    fun isCancelled(): Boolean = current?.cancelled == true
 }
 
 /** Poori screen par halka code-rain + upar chip. Touch nahi rokta. */
 @Composable
 fun BgOverlay() {
     val running = BgTasks.tasks.filter { !it.done }
+    val appCtx = androidx.compose.ui.platform.LocalContext.current.applicationContext
     if (running.isEmpty()) return
     val t = running.last()
     val tr = rememberInfiniteTransition(label = "bg")
@@ -79,6 +86,10 @@ fun BgOverlay() {
             Spacer(Modifier.width(8.dp))
             Text("⚡ ${t.title.take(28)} · ${t.stage}" + if (running.size > 1) "  (+${running.size - 1})" else "", color = Color.White, fontSize = 11.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.width(10.dp))
+            Text("✕", color = Color(0xFFFF6B6B), fontSize = 15.sp, modifier = Modifier.clickable {
+                BgTasks.cancelAll(); PhoneTools.cancelInstall(appCtx)
+            })
         }
     }
 }

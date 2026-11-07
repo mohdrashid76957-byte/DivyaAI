@@ -96,21 +96,35 @@ object Deploy {
         }
     } catch (_: Exception) { "" }
 
-    /** Link browser jaisa GET karke dekho: 200 + asli content aaye tabhi "khulta hai". */
-    private fun verify(link: String): Pair<Boolean, String> {
+    /** Netlify ka "This site is private / Sign in" wall pehchano (team-level site protection). */
+    private fun isPrivateWall(finalUrl: String, body: String): Boolean =
+        finalUrl.contains("app.netlify.com", true) || finalUrl.contains("edge-access", true) ||
+        body.contains("This site is private", true) || body.contains("Sign in to Netlify", true) ||
+        body.contains("edge-access", true)
+
+    /** Link browser jaisa GET karke dekho: 200 + asli content aaye aur login wall na ho tabhi "khulta hai". Triple = (ok, info, private). */
+    private fun verify(link: String): Triple<Boolean, String, Boolean> {
         var info = "no response"
         for (i in 0 until 8) {
             try {
                 plain.newCall(Request.Builder().url(link).header("User-Agent", "Mozilla/5.0 (Linux; Android 14) Chrome/124 Mobile Safari/537.36").build()).execute().use { r ->
                     val body = r.body?.string() ?: ""
                     info = "HTTP ${r.code}"
-                    if (r.isSuccessful && body.contains("<html", true) && !body.contains("Site not found", true)) return true to info
+                    if (isPrivateWall(r.request.url.toString(), body)) return Triple(false, "PRIVATE (Netlify login wall)", true)
+                    if (r.isSuccessful && body.contains("<html", true) && !body.contains("Site not found", true)) return Triple(true, info, false)
                 }
             } catch (e: Exception) { info = e.javaClass.simpleName + ": " + (e.message ?: "").take(60) }
             try { Thread.sleep(1500) } catch (_: InterruptedException) { break }
         }
-        return false to info
+        return Triple(false, info, false)
     }
+
+    /** Best-effort: site ka password/visitor protection hatao (API se jitna ho sake). Fail ho to chup-chaap false. */
+    private fun tryMakePublic(token: String, siteId: String): Boolean = try {
+        val body = "{\"password\":\"\"}".toRequestBody("application/json".toMediaType())
+        http.newCall(Request.Builder().url("https://api.netlify.com/api/v1/sites/$siteId")
+            .header("Authorization", "Bearer $token").patch(body).build()).execute().use { it.isSuccessful }
+    } catch (_: Exception) { false }
 
     private fun openAndCopy(c: Context, link: String) {
         android.os.Handler(android.os.Looper.getMainLooper()).post {
@@ -134,7 +148,20 @@ object Deploy {
             try { Thread.sleep(700) } catch (_: InterruptedException) { break }
         }
         if (state == "error") return "failed: Netlify ne deploy reject kiya: ${err.ifBlank { "karan nahi bataya" }}. (Netlify dashboard > Deploys mein dekho.)"
-        val (ok, info) = verify(link)
+        var (ok, info, priv) = verify(link)
+        if (priv && siteId.isNotBlank()) {
+            tryMakePublic(token, siteId)
+            val v2 = verify(link); ok = v2.first; info = v2.second; priv = v2.third
+        }
+        if (priv) {
+            // Private link Chrome mein kholne se wahi "This site is private" screen aati hai - isliye kholo mat, sirf copy karo.
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                try { (c.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("site", link)) } catch (_: Exception) {}
+            }
+            return "$link deploy to hua LEKIN Netlify ne use PRIVATE rakha hai (visitors ko 'This site is private - Sign in' dikhta hai), isliye public ko nahi khulegi. " +
+                "Ye jhooth mat bolo ki LIVE hai. User ko batao: Netlify dashboard > us site > Site configuration > Access & security > Visitor access/Site protection ko OFF/Public karo " +
+                "(agar team-level hai to Team settings > Site protection > Off). Tab tak preview_website chalao taaki site abhi app mein dikhe. Link copy ho gaya."
+        }
         openAndCopy(c, link)
         return if (ok) "$link LIVE hai aur check kar li (sach mein khulti hai, $info). Link copy ho gaya aur Chrome mein khul raha hai. Ye exact link user ko batao."
         else "$link deploy to hua par abhi khul nahi rahi ($info). Link copy ho gaya, Chrome mein khol diya. Agar 'Site not available' dikhe to Netlify account ka free limit/pause check karo."
