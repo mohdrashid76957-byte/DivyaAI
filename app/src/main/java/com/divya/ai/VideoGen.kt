@@ -64,7 +64,7 @@ object VideoGen {
     private const val DH = 1280f
 
     class Scene(val speak: String, val caption: String, val query: String, val img: String = "")
-    class Plan(val title: String, val scenes: List<Scene>, val character: String = "")
+    class Plan(val title: String, val scenes: List<Scene>, val character: String = "", val style: String = "")
     class Result(val path: String, val title: String, val seconds: Int, val scenes: Int, val visuals: String)
     private class Pcm(val sr: Int, val s: ShortArray)
     class Live(val renderer: Renderer, val total: Double, val startNs: Long) { var track: AudioTrack? = null }
@@ -99,31 +99,36 @@ object VideoGen {
         val t0 = System.currentTimeMillis()
         val seconds = secs.coerceIn(10, 60)
         val isEn = lang.startsWith("en", true)
-        val ai = visuals != "fast"
+        val ai = visuals != "fast" && visuals != "instant"
         imgErr = ""
-        val plan = (if (!ai) localPlan(topic.trim(), script, captions) else null) ?: run { onStage(if (ai) "Kahani aur scenes likh rahi hoon…" else "Script likh rahi hoon…"); writePlan(c, topic.trim(), isEn, seconds, style, ai) }
+        val plan = (if (!ai) localPlan(topic.trim(), script, captions, style) else null) ?: run { onStage(if (ai) "Kahani aur scenes likh rahi hoon…" else "Script likh rahi hoon…"); writePlan(c, topic.trim(), isEn, seconds, style, ai) }
 
         // visuals background threads mein (AI images ya photos), TTS saath-saath
         val prefs = c.getSharedPreferences("divya", 0)
         val pexels = prefs.getString("pexelsKey", "")?.trim() ?: ""
         val src = prefs.getString("vgImg", "auto") ?: "auto"
         val seed = (System.currentTimeMillis() % 90000).toInt() + 1000
-        val pool = Executors.newFixedThreadPool(if (ai) 4 else 3)
+        // SPEED: saari scenes ki images ek saath (parallel). Jaise hi ek image tayyar hoti hai wo `shared` list mein aa jati hai
+        // aur live preview use turant dikha deta hai -> preview ko saari images ka intezaar nahi karna padta.
+        val pool = Executors.newFixedThreadPool(if (ai) min(8, plan.scenes.size).coerceAtLeast(1) else 3)
         val used = java.util.Collections.synchronizedSet(mutableSetOf<Long>())
+        val shared: MutableList<Bitmap?> = java.util.Collections.synchronizedList(MutableList<Bitmap?>(plan.scenes.size) { null })
         val futs: List<Future<Bitmap?>> = plan.scenes.mapIndexed { i, s ->
-            pool.submit<Bitmap?> { if (ai) aiImage(c, plan, s, seed, src, pexels, used) else if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used) }
+            pool.submit<Bitmap?> {
+                val b = if (ai) aiImage(c, plan, s, seed, src, pexels, used) else if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used)
+                if (b != null) shared[i] = b
+                b
+            }
         }
 
         onStage("Awaaz bana rahi hoon…")
         val voices = try { synth(c, plan.scenes, isEn) } catch (e: Throwable) { pool.shutdownNow(); throw e }
-        val dl = System.currentTimeMillis() + (if (ai) 70_000L else 1_500L)
-        while (futs.any { !it.isDone } && System.currentTimeMillis() < dl) {
-            if (ai) onStage("AI images ban rahi hain… ${futs.count { it.isDone }}/${futs.size}")
-            try { Thread.sleep(250) } catch (_: InterruptedException) { break }
+        // Preview shuru karne se pehle sirf PEHLI image ka thoda intezaar (max 4 sec). Baaki images video chalte-chalte aati rahengi.
+        val firstDl = System.currentTimeMillis() + (if (ai) 4_000L else 1_500L)
+        while (System.currentTimeMillis() < firstDl && (if (ai) !futs[0].isDone else futs.any { !it.isDone })) {
+            if (ai) onStage("Pehla scene ban raha hai…")
+            try { Thread.sleep(80) } catch (_: InterruptedException) { break }
         }
-        val raw = futs.map { if (it.isDone) try { it.get() } catch (_: Exception) { null } else null }
-        pool.shutdownNow()
-        val bmps = fillGaps(raw)
 
         val sr = voices.first().sr
         val lead = (sr * 0.12).toInt(); val tail = (sr * 0.30).toInt()
@@ -144,15 +149,27 @@ object VideoGen {
         val totalSec = total.toDouble() / sr
 
         // INSTANT: awaaz + live video preview abhi shuru, mp4 export peeche chalti rahegi
-        val live = Live(Renderer(plan, bmps, starts, durs, speakDur), totalSec, System.nanoTime())
+        // Preview `shared` list se chalta hai: jo images baad mein aati hain wo apne aap dikhne lagti hain.
+        val live = Live(Renderer(plan, shared, starts, durs, speakDur), totalSec, System.nanoTime())
         live.track = playAudio(audio, sr)
         VideoBus.live = live
         Handler(Looper.getMainLooper()).post { VideoBus.openTick++ }
         val tmpV = File(c.cacheDir, "vg_v.mp4"); val tmpA = File(c.cacheDir, "vg_a.m4a")
         tmpV.delete(); tmpA.delete()
-        onStage("Video encode ho rahi hai…")
         var audioErr: Throwable? = null
         val aThread = Thread { try { encodeAudio(audio, sr, tmpA) } catch (e: Throwable) { audioErr = e } }.also { it.start() }
+
+        // mp4 export ke liye baaki images ka intezaar (preview isse nahi rukta)
+        if (ai) {
+            val dl = System.currentTimeMillis() + 70_000L
+            while (futs.any { !it.isDone } && System.currentTimeMillis() < dl) {
+                onStage("Baaki AI images aa rahi hain… ${futs.count { it.isDone }}/${futs.size}")
+                try { Thread.sleep(200) } catch (_: InterruptedException) { break }
+            }
+        }
+        pool.shutdownNow()
+        val bmps: List<Bitmap?> = fillGaps(ArrayList(shared))
+        onStage("Video encode ho rahi hai…")
         val visualsTxt = if (bmps.any { it != null }) (if (ai) "AI images" else "photos") else (if (ai) "neon (AI image nahi bani: $imgErr)" else "neon animated")
         encodeVideo(plan, bmps, starts, durs, speakDur, totalSec, tmpV) { p -> onStage("Video encode… ${(p * 100).toInt()}%") }
 
@@ -174,11 +191,11 @@ object VideoGen {
 
     // ------------------------------------------------------------------ SCRIPT
     /** Divya (Live model) ne script khud bheji ho ("scene1 | scene2 | ...") to alag Gemini call ki zaroorat nahi -> 2-5 sec bachte hain. */
-    private fun localPlan(topic: String, script: String, captions: String): Plan? {
+    private fun localPlan(topic: String, script: String, captions: String, style: String): Plan? {
         val sp = script.split("|").map { it.trim() }.filter { it.isNotEmpty() }.take(8)
         if (sp.isEmpty()) return null
         val cp = captions.split("|").map { it.trim() }
-        return Plan(topic.take(40).ifBlank { "Video" }, sp.mapIndexed { i, t -> Scene(t, cp.getOrNull(i)?.takeIf { it.isNotEmpty() } ?: t, topic) })
+        return Plan(topic.take(40).ifBlank { "Video" }, sp.mapIndexed { i, t -> Scene(t, cp.getOrNull(i)?.takeIf { it.isNotEmpty() } ?: t, topic) }, "", style.lowercase())
     }
 
     private fun writePlan(c: Context, topic: String, en: Boolean, seconds: Int, style: String, ai: Boolean): Plan {
@@ -238,17 +255,19 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
         val order = when (src) { "pollinations" -> listOf("p"); "gemini" -> listOf("g"); "pexels" -> listOf("x"); else -> listOf("p", "g", "x") }
         for (o in order) {
             val b = try {
-                when (o) { "p" -> pollinations(prompt, seed); "g" -> geminiImage(c, prompt); else -> if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used) }
+                when (o) { "p" -> pollinations(prompt, seed, c.getSharedPreferences("divya", 0).getString("vgModel", "turbo") ?: "turbo"); "g" -> geminiImage(c, prompt); else -> if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used) }
             } catch (e: Exception) { imgErr = "$o: ${e.message}"; Log.w(TAG, "image $o: ${e.message}"); null }
             if (b != null) return b
         }
         return null
     }
 
-    private fun pollinations(prompt: String, seed: Int): Bitmap? {
+    /** SPEED: video 576x1024 par encode hoti hai, isliye image bhi utni hi maango (720x1280 bekaar mein slow thi).
+     *  Model "turbo" = bahut tez (2-5 sec); "flux" = behtar quality par slow. Pref "vgModel" se badlo. */
+    private fun pollinations(prompt: String, seed: Int, model: String = "turbo"): Bitmap? {
         for (attempt in 0..1) {
             val url = "https://image.pollinations.ai/prompt/" + java.net.URLEncoder.encode(prompt, "UTF-8").replace("+", "%20") +
-                "?width=720&height=1280&model=flux&nologo=true&seed=${seed + attempt}"
+                "?width=$W&height=$H&model=$model&nologo=true&seed=${seed + attempt}"
             val bytes = imgHttp.newCall(Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 DivyaAI").build()).execute().use { r ->
                 if (!r.isSuccessful) { imgErr = "pollinations ${r.code}"; null } else r.body?.bytes()
             }
@@ -457,7 +476,12 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
         val wmP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 30f; typeface = Typeface.MONOSPACE; color = gold; alpha = 150 }
         val chunks: List<List<String>> = plan.scenes.map { chunk(it.caption) }
         val layouts = HashMap<String, Pair<StaticLayout, StaticLayout>>()
-        val palette = intArrayOf(0xFF0B3D91.toInt(), 0xFF6A1B9A.toInt(), 0xFF00695C.toInt(), 0xFFB71C1C.toInt(), 0xFFEF6C00.toInt(), 0xFF283593.toInt(), 0xFF004D40.toInt(), 0xFF880E4F.toInt())
+        val basePalette = intArrayOf(0xFF0B3D91.toInt(), 0xFF6A1B9A.toInt(), 0xFF00695C.toInt(), 0xFFB71C1C.toInt(), 0xFFEF6C00.toInt(), 0xFF283593.toInt(), 0xFF004D40.toInt(), 0xFF880E4F.toInt())
+        val palette: IntArray = when {
+            plan.style.contains("funny") -> intArrayOf(0xFFFF6F00.toInt(), 0xFFFFB300.toInt(), 0xFFD81B60.toInt(), 0xFF00ACC1.toInt(), 0xFF7CB342.toInt(), 0xFF8E24AA.toInt())
+            plan.style.contains("attitude") || plan.style.contains("badmash") -> intArrayOf(0xFF8B0000.toInt(), 0xFF212121.toInt(), 0xFFB71C1C.toInt(), 0xFF37474F.toInt(), 0xFF4A148C.toInt(), 0xFF000000.toInt())
+            else -> basePalette
+        }
         val grad = LinearGradient(0f, DH * 0.5f, 0f, DH.toFloat(), 0x00000000, 0xAA000000.toInt(), Shader.TileMode.CLAMP)
         val gradTop = LinearGradient(0f, 0f, 0f, DH * 0.2f, 0x99000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
 
@@ -480,8 +504,9 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
             if (si >= plan.scenes.size) si = plan.scenes.size - 1
             val local = (t - starts[si]).coerceAtLeast(0.0); val dur = durs[si]
             val prog = (local / dur).coerceIn(0.0, 1.0).toFloat()
-            val bmp = bmps[si]
-            if (bmp != null && !bmp.isRecycled) drawPhoto(cv, bmp, prog, si) else drawNeon(cv, t.toFloat(), si)
+            // is scene ki image abhi na aayi ho to pichhli scene ki image dikhao (neon sirf tab jab koi bhi image nahi)
+            val bmp = (si downTo 0).firstNotNullOfOrNull { k -> bmps[k]?.takeIf { !it.isRecycled } }
+            if (bmp != null) drawPhoto(cv, bmp, prog, si) else drawNeon(cv, t.toFloat(), si)
             if (bmp != null && si + 1 < bmps.size && dur - local < 0.4) { // crossfade agle scene ki image mein
                 val nb = bmps[si + 1]
                 if (nb != null && nb !== bmp) { p.alpha = (255 * (1 - (dur - local) / 0.4)).toInt().coerceIn(0, 255); drawPhoto(cv, nb, 0f, si + 1); p.alpha = 255 }
