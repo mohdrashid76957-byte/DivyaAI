@@ -35,18 +35,24 @@ object Growth {
         p(c).edit().putString("gr_platform", pf).putInt("gr_target", target).putInt("gr_days", days)
             .putString("gr_niche", niche.trim()).putInt("gr_start", startCount.coerceAtLeast(0)).putInt("gr_now", startCount.coerceAtLeast(0))
             .putLong("gr_startAt", System.currentTimeMillis()).putInt("gr_posts", 0).putString("gr_topics", "[]").apply()
+        if (startCount == 0 && DivyaService.instance != null) Thread {
+            val r = refreshCounts(c); p(c).edit().putInt("gr_start", p(c).getInt("gr_now", 0)).apply(); Log.i(TAG, "baseline $r")
+        }.start()
         val perDay = Math.ceil((target - startCount).coerceAtLeast(1).toDouble() / days).toInt()
-        return "done: goal set - $pf par $days din mein $target (abhi $startCount). Roz ~$perDay naye follower chahiye. " +
+        return "done: goal set - $pf par $days din mein $target (abhi $startCount). Roz ~$perDay naye follower chahiye (abhi ka asli count Divya khud padh rahi hai). " +
             "Honest baat user ko batao: ye stretch goal hai, guarantee nahi - sabse zyada fark roz 1-3 achhi video + pehle 2 second ka hook + consistency se padta hai. " +
             "Ab pucho: roz kitne baje auto-post chalu karun? (growth_autopilot)"
     }
 
-    /** current > 0 ho to naya follower count save karke pace bataata hai. */
+    /** current>0: user ka bataya count; 0: Divya khud app se padhti hai; -1: sirf saved count se pace. */
     fun status(c: Context, current: Int): String {
         val pr = p(c)
         val target = pr.getInt("gr_target", 0)
         if (target == 0) return "failed: abhi koi goal set nahi hai. Pehle set_growth_goal (platform, target, days, niche)."
+        var src = "user ne bataya"
         if (current > 0) pr.edit().putInt("gr_now", current).apply()
+        else if (current == 0) { val r = refreshCounts(c); src = "khud padha ($r)" }
+        else src = "pichhli reading"
         val now = pr.getInt("gr_now", 0); val start = pr.getInt("gr_start", 0); val days = pr.getInt("gr_days", 7)
         val used = ((System.currentTimeMillis() - pr.getLong("gr_startAt", 0L)) / 86_400_000L).toInt() + 1
         val left = (days - used + 1).coerceAtLeast(0)
@@ -61,7 +67,65 @@ object Growth {
             else -> "Abhi pace kam hai (roz ~${"%.0f".format(pace)} aa rahe, chahiye ~$perDay). Posts badhao ya hook/topic badlo - best chalne wale topic dobara banao."
         }
         return "done: ${pr.getString("gr_platform", "")} | din $used/$days | abhi $now / $target | ${pr.getInt("gr_posts", 0)} posts ho chuke | $verdict " +
-            "(Follower count Divya khud nahi padh sakti - user se pucho/ya wo bataye to growth_status(current) se update karo.)"
+            "(Count source: $src)"
+    }
+
+
+    // ------------------------------------------------------------------ AUTO FOLLOWER / SUBSCRIBER COUNT
+    private val numRe = Regex("([0-9][0-9.,]*)\\s*([KkMm]?)[\\s|]*(?:\\[btn\\]\\s*)?(?:followers?|subscribers?)", RegexOption.IGNORE_CASE)
+
+    /** "1,234" / "1.2K" / "3M" -> Int. Suffix ho to '.' decimal; warna , aur . hazaar-separator. */
+    private fun parseCount(num: String, suf: String): Int? {
+        val n = num.trim().trimEnd('.', ',')
+        if (suf.isNotEmpty()) {
+            val v = n.replace(",", ".").toDoubleOrNull() ?: return null
+            return (v * if (suf.equals("k", true)) 1_000 else 1_000_000).toInt()
+        }
+        return n.replace(",", "").replace(".", "").toIntOrNull()
+    }
+
+    private fun countFrom(screen: String): Int? =
+        numRe.findAll(screen).mapNotNull { parseCount(it.groupValues[1], it.groupValues[2]) }.firstOrNull()
+
+    private fun backToDivya(c: Context) {
+        try { c.packageManager.getLaunchIntentForPackage(c.packageName)?.let { c.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } catch (_: Exception) {}
+    }
+
+    /** App kholkar apna profile/channel dekhta hai aur count padhta hai. null = nahi mila (login/screen alag). */
+    fun readCount(c: Context, platform: String): Int? {
+        val svc = DivyaService.instance ?: return null
+        val pkg = if (platform == "instagram") IG else YT
+        val l = c.packageManager.getLaunchIntentForPackage(pkg) ?: return null
+        try { c.startActivity(l.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { return null }
+        svc.waitOpen(pkg, 5000); SystemClock.sleep(1800)
+        var found: Int? = null
+        try {
+            if (platform == "instagram") {
+                if (!(svc.tapDesc("Profile", 2500) || svc.tapText("Profile", 800))) return null
+                for (i in 0 until 5) { SystemClock.sleep(1200); found = countFrom(svc.readScreen(2500)); if (found != null) break }
+            } else {
+                if (svc.tapAnyExact(listOf("You", "YOU"), 2500) == null) return null
+                SystemClock.sleep(1500)
+                found = countFrom(svc.readScreen(2500))
+                if (found == null) {
+                    svc.tapAnyExact(listOf("View channel", "Your channel", "VIEW CHANNEL"), 2500)
+                    for (i in 0 until 5) { SystemClock.sleep(1200); found = countFrom(svc.readScreen(2500)); if (found != null) break }
+                }
+            }
+        } finally { backToDivya(c) }
+        return found
+    }
+
+    /** Goal wale platform(s) ka count khud padho aur save karo. Result: kya mila. */
+    fun refreshCounts(c: Context): String {
+        val pr = p(c); val pf = pr.getString("gr_platform", "youtube").orEmpty()
+        val list = if (pf == "both") listOf("youtube", "instagram") else listOf(pf)
+        val got = HashMap<String, Int>()
+        for (t in list) { BgTasks.stage("$t count dekh rahi hoon…"); readCount(c, t)?.let { got[t] = it; pr.edit().putInt("gr_now_$t", it).apply() } }
+        if (got.isEmpty()) return "auto-count nahi mil paya (login / Accessibility / app screen check karo)"
+        val now = if (pf == "both") list.minOf { pr.getInt("gr_now_$it", 0) } else got.values.first()
+        pr.edit().putInt("gr_now", now).apply()
+        return got.entries.joinToString(", ") { "${it.key}: ${it.value}" }
     }
 
     private fun norm(s: String): String = when {
@@ -182,7 +246,10 @@ object Growth {
         val t = BgTasks.start("Growth post")
         try {
             val r = post(c, platform, "", true)
-            Scheduler.notify(c, "Divya: aaj ka post", r.take(180))
+            BgTasks.stage("Count update…")
+            val cnt = try { refreshCounts(c) } catch (_: Exception) { "count nahi mila" }
+            val prog = status(c, current = -1)
+            Scheduler.notify(c, "Divya: aaj ka post", (r.take(120) + " | " + cnt + " | " + prog.take(150)))
         } finally { BgTasks.finish(t) }
     }
 }
