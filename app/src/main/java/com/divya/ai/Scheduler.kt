@@ -97,7 +97,7 @@ object Scheduler {
         if (kind != "remind" && svc == null) { notify(c, "Divya: kaam nahi hua", "Accessibility OFF tha. '$kind $person: $msg' manually karo."); return }
         when (kind) {
             "send_whatsapp" -> notify(c, "Divya: WhatsApp", svc!!.whatsappMessage(person, msg))
-            "growth_post" -> Growth.runScheduled(c, person)
+            "growth_post" -> Growth.runScheduled(c, person, msg)
             "remind" -> { notify(c, "Divya yaad dila rahi hai", msg); speak(c, msg, false) }
             "call_and_say" -> {
                 val r = svc!!.callPerson(person)

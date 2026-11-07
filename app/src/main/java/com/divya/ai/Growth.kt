@@ -124,7 +124,7 @@ object Growth {
         for (t in list) { BgTasks.stage("$t count dekh rahi hoon…"); readCount(c, t)?.let { got[t] = it; pr.edit().putInt("gr_now_$t", it).apply() } }
         if (got.isEmpty()) return "auto-count nahi mil paya (login / Accessibility / app screen check karo)"
         val now = if (pf == "both") list.minOf { pr.getInt("gr_now_$it", 0) } else got.values.first()
-        pr.edit().putInt("gr_now", now).apply()
+        pr.edit().putInt("gr_now", now).apply(); stampCount(c, now)
         return got.entries.joinToString(", ") { "${it.key}: ${it.value}" }
     }
 
@@ -143,8 +143,10 @@ object Growth {
         val pr = p(c); val niche = pr.getString("gr_niche", "").orEmpty().ifBlank { "interesting facts" }
         val old = try { JSONArray(pr.getString("gr_topics", "[]")) } catch (_: Exception) { JSONArray() }
         val prev = (0 until old.length()).joinToString("; ") { old.getString(it) }.takeLast(600)
+        val trend = try { PhoneTools.webSearch(c, "trending $niche short video topics this week India").take(700) } catch (_: Exception) { "" }
+        val best = bestTopics(c)
         val r = ai(c, "You are a viral short-form video strategist. Reply with ONE video idea only (one line, Hinglish, under 20 words), no quotes, no numbering.",
-            "Channel niche: $niche. Already made (do NOT repeat): $prev. Give a fresh idea with a shocking first-2-second hook that a new viewer would watch fully and follow for more.", false)
+            "Channel niche: $niche. Already made (do NOT repeat): $prev. " + (if (best.isNotBlank()) "Topics that gained the most followers so far (make something in this spirit): $best. " else "") + (if (trend.isNotBlank()) "Current trend notes: $trend. " else "") + "Give a fresh idea with a shocking first-2-second hook that a new viewer would watch fully and follow for more.", false)
         val idea = r?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()?.trim('"') ?: "$niche - ek chauka dene wala fact"
         old.put(idea); while (old.length() > 25) old.remove(0)
         pr.edit().putString("gr_topics", old.toString()).apply()
@@ -182,11 +184,16 @@ object Growth {
             file = VideoGen.list(c).firstOrNull() ?: return "failed: video file nahi mili"
         }
         if (BgTasks.isCancelled()) return "done: cancel kar diya."
-        val meta = metaFor(c, file)
+        val vf: File = file
+        val meta = metaFor(c, vf)
         val targets = if (pf == "both") listOf("youtube", "instagram") else listOf(pf)
+        val topicUsed = topic.ifBlank { p(c).let { pr -> try { JSONArray(pr.getString("gr_topics", "[]")).let { a -> if (a.length() > 0) a.getString(a.length() - 1) else meta.title } } catch (_: Exception) { meta.title } } }
         val out = targets.map { t ->
             BgTasks.stage("${t.replaceFirstChar { it.uppercase() }} par upload…")
-            "$t: " + uploadTo(c, svc, t, file, meta)
+            var r = uploadTo(c, svc, t, vf, meta)
+            if (!r.startsWith("done") && !r.contains("installed nahi") && !BgTasks.isCancelled()) { BgTasks.stage("Dobara koshish…"); SystemClock.sleep(2000); svc.global("back"); r = uploadTo(c, svc, t, vf, meta) }
+            logPost(c, topicUsed, meta.title, t, r.startsWith("done"))
+            "$t: $r"
         }
         val pr = p(c); if (out.any { it.contains("done:") }) pr.edit().putInt("gr_posts", pr.getInt("gr_posts", 0) + 1).apply()
         return out.joinToString(" | ") + " | Title: ${meta.title}"
@@ -227,29 +234,107 @@ object Growth {
         return "partial: ${platform} khola aur video load ki, par aakhri Upload/Share button nahi mila (app ka design badla ho sakta hai). Caption copy ho gaya hai - screen par bacha step haath se kar do. Screen: " + svc.readScreen(400)
     }
 
-    // ------------------------------------------------------------------ AUTOPILOT (roz)
-    fun autopilot(c: Context, on: Boolean, hour: Int, minute: Int): String {
-        val pr = p(c)
-        if (!on) { pr.edit().putBoolean("gr_auto", false).apply(); return "done: roz ka auto-post band. (Pehle se laga hua ek aakhri schedule aa sakta hai - skip karne ke liye cancel_schedules.)" }
-        if (pr.getInt("gr_target", 0) == 0) return "failed: pehle goal set karo (set_growth_goal)."
-        if (hour !in 0..23) return "failed: time batao (kitne baje roz post karun?)."
-        pr.edit().putBoolean("gr_auto", true).putInt("gr_h", hour).putInt("gr_m", minute.coerceIn(0, 59)).apply()
-        val r = Scheduler.add(c, "growth_post", pr.getString("gr_platform", "youtube").orEmpty(), "daily growth post", hour, minute, 0)
-        return if (r.startsWith("done")) "done: roz %02d:%02d par ${pr.getString("gr_platform", "")} par nayi video apne-aap ban kar post hogi. $r".format(hour, minute) else r
+    // ------------------------------------------------------------------ HISTORY + LEARNING
+    private fun hist(c: Context): JSONArray = try { JSONArray(p(c).getString("gr_hist", "[]")) } catch (_: Exception) { JSONArray() }
+    private fun saveHist(c: Context, a: JSONArray) { while (a.length() > 60) a.remove(0); p(c).edit().putString("gr_hist", a.toString()).apply() }
+
+    private fun logPost(c: Context, topic: String, title: String, pf: String, ok: Boolean) {
+        val a = hist(c)
+        a.put(JSONObject().put("t", System.currentTimeMillis()).put("topic", topic).put("title", title).put("pf", pf).put("ok", ok).put("count", 0))
+        saveHist(c, a)
     }
 
-    /** Scheduler se bulaya jata hai (background thread). Pehle agla din arm karo, phir aaj ki video post karo. */
-    fun runScheduled(c: Context, platform: String) {
+    /** Latest entry ka count bharo (agar pehle khali ho) - isse pata chalta hai kis post ke baad kitne naye follower aaye. */
+    private fun stampCount(c: Context, now: Int) {
+        val a = hist(c); if (a.length() == 0) return
+        val o = a.getJSONObject(a.length() - 1)
+        if (o.optInt("count") == 0) { o.put("count", now); saveHist(c, a) }
+    }
+
+    private class Row(val topic: String, val title: String, val delta: Int, val hour: Int, val ok: Boolean)
+
+    private fun rows(c: Context): List<Row> {
+        val a = hist(c); val out = ArrayList<Row>()
+        var prev = p(c).getInt("gr_start", 0)
+        for (k in 0 until a.length()) {
+            val o = a.getJSONObject(k); val cnt = o.optInt("count")
+            val d = if (cnt > 0 && prev > 0) cnt - prev else 0
+            if (cnt > 0) prev = cnt
+            val h = java.util.Calendar.getInstance().apply { timeInMillis = o.optLong("t") }.get(java.util.Calendar.HOUR_OF_DAY)
+            out.add(Row(o.optString("topic"), o.optString("title"), d, h, o.optBoolean("ok")))
+        }
+        return out
+    }
+
+    private fun bestTopics(c: Context): String =
+        rows(c).filter { it.delta > 0 }.sortedByDescending { it.delta }.take(3).joinToString("; ") { it.topic.take(60) }
+
+    /** growth_report: pichhli posts ka hisaab + kya chal raha hai. */
+    fun report(c: Context): String {
+        if (p(c).getInt("gr_target", 0) == 0) return "failed: pehle goal set karo."
+        val r = rows(c).takeLast(7)
+        if (r.isEmpty()) return "done: abhi koi post nahi hui. Pehle growth_post ya autopilot chalao."
+        val lines = r.joinToString("\n") { "• ${it.title.take(45)} - ${if (it.delta != 0) (if (it.delta > 0) "+" else "") + it.delta + " followers" else "count pending"}${if (!it.ok) " (upload adhura)" else ""}" }
+        val best = r.filter { it.delta > 0 }.maxByOrNull { it.delta }
+        val bestHour = r.filter { it.delta > 0 }.groupBy { it.hour }.maxByOrNull { e -> e.value.sumOf { it.delta } }?.key
+        return "done: Pichhli ${r.size} posts:\n$lines\n" +
+            (if (best != null) "Sabse achha: '${best.topic.take(50)}' (+${best.delta}). Aisa aur banaungi. " else "Abhi kisi post se clear jeet nahi dikhi. ") +
+            (if (bestHour != null) "Best time ~$bestHour:00 ke aas-paas lag raha hai. " else "") +
+            "Note: ye andaza hai (follower aur bhi wajah se badhte hain). Total posts ${p(c).getInt("gr_posts", 0)}."
+    }
+
+    // ------------------------------------------------------------------ PROMOTION (real share, spam nahi)
+    fun promote(c: Context, link: String): String {
+        val pr = p(c)
+        if (link.isNotBlank()) pr.edit().putString("gr_link", link.trim()).apply()
+        val lk = pr.getString("gr_link", "").orEmpty()
+        val niche = pr.getString("gr_niche", "").orEmpty(); val pf = pr.getString("gr_platform", "youtube").orEmpty()
+        val msg = ai(c, "You write short, friendly Hinglish promo messages that a creator sends to friends/family/WhatsApp status. 2-3 lines, 1-2 emojis, a clear ask (watch + follow), no false claims, no begging spam.",
+            "Channel: $pf, niche: $niche, link: ${lk.ifBlank { "(none yet)" }}. Include the link if present.", false)
+            ?: "Meri nayi $pf channel dekho aur follow karo! ${lk}"
+        val i = Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, msg), "Channel promote karo").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try { c.startActivity(i) } catch (e: Exception) { return "failed: share sheet nahi khula (${e.message})" }
+        return "done: promo message tayyar, share sheet khul gayi - user WhatsApp status / groups / dost chun kar bheje (Divya sabko apne-aap spam nahi karti). Message: ${msg.take(160)}" +
+            if (lk.isBlank()) " | Tip: channel ka link bata do to message mein judega." else ""
+    }
+
+    // ------------------------------------------------------------------ AUTOPILOT (roz, 1-3 posts)
+    fun autopilot(c: Context, on: Boolean, hour: Int, minute: Int, perDay: Int = 1): String {
+        val pr = p(c)
+        if (!on) { pr.edit().putBoolean("gr_auto", false).putInt("gr_gen", pr.getInt("gr_gen", 0) + 1).apply(); return "done: roz ka auto-post band." }
+        if (pr.getInt("gr_target", 0) == 0) return "failed: pehle goal set karo (set_growth_goal)."
+        if (hour !in 0..23) return "failed: time batao (kitne baje roz post karun?)."
+        val n = perDay.coerceIn(1, 3); val m = minute.coerceIn(0, 59)
+        val gen = pr.getInt("gr_gen", 0) + 1   // purane schedules khud ignore ho jaate hain
+        val slots = (0 until n).map { (hour + it * (if (n == 2) 8 else 5)) % 24 }
+        pr.edit().putBoolean("gr_auto", true).putInt("gr_gen", gen).putInt("gr_fail", 0).putString("gr_slots", slots.joinToString(",") { "$it:$m" }).apply()
+        val pf = pr.getString("gr_platform", "youtube").orEmpty()
+        var last = ""
+        slots.forEachIndexed { k, h -> last = Scheduler.add(c, "growth_post", pf, "slot:$k:$gen", h, m, 0); SystemClock.sleep(5) }
+        return if (last.startsWith("done")) "done: roz ${slots.joinToString(", ") { "%02d:%02d".format(it, m) }} par $pf par nayi video apne-aap ban kar post hogi. $last" else last
+    }
+
+    /** Scheduler se bulaya jata hai. Pehle agla din arm karo, phir post. 3 baar lagataar fail ho to autopilot ruk jata hai. */
+    fun runScheduled(c: Context, platform: String, msg: String = "") {
         val pr = p(c)
         if (!pr.getBoolean("gr_auto", false)) return
-        Scheduler.add(c, "growth_post", platform, "daily growth post", pr.getInt("gr_h", 18), pr.getInt("gr_m", 0), 0)
+        val parts = msg.split(":")
+        val slot = parts.getOrNull(1)?.toIntOrNull() ?: 0; val gen = parts.getOrNull(2)?.toIntOrNull() ?: pr.getInt("gr_gen", 0)
+        if (gen != pr.getInt("gr_gen", 0)) return
+        val sl = pr.getString("gr_slots", "18:0").orEmpty().split(",").getOrNull(slot)?.split(":")
+        Scheduler.add(c, "growth_post", platform, msg.ifBlank { "slot:0:$gen" }, sl?.getOrNull(0)?.toIntOrNull() ?: 18, sl?.getOrNull(1)?.toIntOrNull() ?: 0, 0)
         val t = BgTasks.start("Growth post")
         try {
             val r = post(c, platform, "", true)
+            val ok = r.contains("done:")
+            val fails = if (ok) 0 else pr.getInt("gr_fail", 0) + 1
+            pr.edit().putInt("gr_fail", fails).apply()
             BgTasks.stage("Count update…")
             val cnt = try { refreshCounts(c) } catch (_: Exception) { "count nahi mila" }
             val prog = status(c, current = -1)
-            Scheduler.notify(c, "Divya: aaj ka post", (r.take(120) + " | " + cnt + " | " + prog.take(150)))
+            var note = ""
+            if (fails >= 3) { pr.edit().putBoolean("gr_auto", false).apply(); note = " | ⚠ 3 baar lagataar fail - autopilot roka. Apps/login/Accessibility check karke dobara chalao." }
+            Scheduler.notify(c, if (ok) "Divya: aaj ka post ✅" else "Divya: post adhura ⚠", (r.take(110) + " | " + cnt + " | " + prog.take(120) + note))
         } finally { BgTasks.finish(t) }
     }
 }
