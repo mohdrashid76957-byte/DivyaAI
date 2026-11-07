@@ -451,3 +451,10 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - Awaaz bante hi video **turant screen par live chalne lagti hai** (Canvas live render + awaaz); mp4 export peeche background mein hoti hai aur ready hone par player + Share aa jata hai.
 - Pexels photos ke liye sirf 1.5 sec intezaar (nahi aayi to neon background), taaki start na ruke.
 - Screen se typed topic dene par script ke liye Gemini call hoti hai (2-5 sec extra); voice se bolne par nahi.
+
+## v2.24.0 - REAL AI visuals (kahani wali cinematic video)
+- Pehle video sirf neon background par text dikhati thi. Ab **AI Real** mode (default): Gemini cinematic story script likhta hai (ek consistent `character` + har scene ka photorealistic `image` prompt), har scene ki **asli AI image** banti hai, Ken-Burns zoom/pan + crossfade, Hindi/English voiceover, subtitles.
+- Image source (Video Gen > Settings): **Auto** = Pollinations (free, bina key) -> Gemini image (`imgModel` pref, default gemini-2.5-flash-image; free key par band ho sakta hai) -> Pexels. Sab fail ho to neon + asli error result mein.
+- Lambai 15/30/45/60 sec (~5 sec per scene, max 12 scenes). AI images 10-40 sec lagti hain, isliye preview thodi der baad shuru hoti hai. Jaldi ke liye "⚡ Neon (fast)".
+- Voice se: Divya ab script nahi likhti, bas poora idea `make_video(topic)` ko deti hai.
+- Limit: ye images + motion hai, asli AI-video (har frame generate) nahi; character consistency same prompt + same seed se aati hai, perfect nahi.

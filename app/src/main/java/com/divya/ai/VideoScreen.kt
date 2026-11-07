@@ -33,7 +33,9 @@ fun VideoGenScreen(th: UiTheme, ctx: Context) {
     var tab by remember { mutableStateOf(0) }
     var topic by remember { mutableStateOf("") }
     var lang by remember { mutableStateOf(prefs.getString("vgLang", "hindi") ?: "hindi") }
-    var secs by remember { mutableStateOf(prefs.getInt("vgSecs", 15)) }
+    var secs by remember { mutableStateOf(prefs.getInt("vgSecs", 30)) }
+    var vis by remember { mutableStateOf(prefs.getString("vgVis", "ai") ?: "ai") }
+    var imgSrc by remember { mutableStateOf(prefs.getString("vgImg", "auto") ?: "auto") }
     var style by remember { mutableStateOf(prefs.getString("vgStyle", "facts") ?: "facts") }
     var sel by remember { mutableStateOf(VideoBus.lastPath) }
     var tick by remember { mutableStateOf(0) }
@@ -98,8 +100,10 @@ fun VideoGenScreen(th: UiTheme, ctx: Context) {
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = th.text, unfocusedTextColor = th.text))
                 Text("Bhasha", color = th.text.copy(alpha = 0.7f), fontSize = 12.sp)
                 Chips(listOf("hindi" to "Hindi", "english" to "English"), lang) { lang = it; prefs.edit().putString("vgLang", it).apply() }
+                Text("Visuals", color = th.text.copy(alpha = 0.7f), fontSize = 12.sp)
+                Chips(listOf("ai" to "🎨 AI Real", "fast" to "⚡ Neon (fast)"), vis) { vis = it; prefs.edit().putString("vgVis", it).apply() }
                 Text("Lambai", color = th.text.copy(alpha = 0.7f), fontSize = 12.sp)
-                Chips(listOf("15" to "15s", "30" to "30s", "45" to "45s"), secs.toString()) { secs = it.toInt(); prefs.edit().putInt("vgSecs", secs).apply() }
+                Chips(listOf("15" to "15s", "30" to "30s", "45" to "45s", "60" to "60s"), secs.toString()) { secs = it.toInt(); prefs.edit().putInt("vgSecs", secs).apply() }
                 Text("Style", color = th.text.copy(alpha = 0.7f), fontSize = 12.sp)
                 Chips(listOf("facts" to "Facts", "motivation" to "Motivation", "story" to "Story", "news" to "News"), style) { style = it; prefs.edit().putString("vgStyle", it).apply() }
 
@@ -113,13 +117,13 @@ fun VideoGenScreen(th: UiTheme, ctx: Context) {
                     Btn(th, "⚡ Video banao") {
                         val t = topic.trim()
                         if (t.isBlank()) toast("Pehle topic likho") else {
-                            Thread { VideoGen.createTracked(ctx, t, lang, secs, style) }.start()
+                            Thread { VideoGen.createTracked(ctx, t, lang, secs, style, "", "", vis) }.start()
                         }
                     }
                 }
                 VideoBus.error?.let { if (!VideoBus.busy) Text("⚠ $it", color = Color(0xFFFF6B6B), fontSize = 13.sp) }
-                if (prefs.getString("pexelsKey", "").isNullOrBlank())
-                    Text("Tip: Settings tab mein free Pexels key daalo to background asli photos ke aate hain (abhi neon animated background).", color = th.text.copy(alpha = 0.6f), fontSize = 12.sp)
+                if (vis == "ai")
+                    Text("Tip: AI Real mode mein har scene ki asli AI image banti hai (10-40 sec). Jaldi chahiye to Neon (fast) chuno.", color = th.text.copy(alpha = 0.6f), fontSize = 12.sp)
 
                 val cur = sel?.let { File(it) }?.takeIf { it.exists() }
                 if (cur != null) {
@@ -149,6 +153,9 @@ fun VideoGenScreen(th: UiTheme, ctx: Context) {
                 Btn(th, "🔄 Refresh") { tick++ }
             }
             else -> {
+                Text("AI image source (Visuals = AI Real ke liye)", color = th.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Chips(listOf("auto" to "Auto", "pollinations" to "Free AI", "gemini" to "Gemini"), imgSrc) { imgSrc = it; prefs.edit().putString("vgImg", it).apply() }
+                Text("Auto = pehle free Pollinations AI (bina key), na chale to Gemini image (aapki key; free tier par band ho sakta hai), phir Pexels. AI images ko 10-40 sec lagte hain, isliye video thodi der baad shuru hoti hai.", color = th.text.copy(alpha = 0.6f), fontSize = 12.sp)
                 Text("Background photos (optional, free): pexels.com/api par free key lo aur yahan paste karo. Key na ho to neon animated background chalta hai.", color = th.text.copy(alpha = 0.8f), fontSize = 13.sp)
                 OutlinedTextField(pexels, { pexels = it }, Modifier.fillMaxWidth(), label = { Text("Pexels API key") }, singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = th.text, unfocusedTextColor = th.text))

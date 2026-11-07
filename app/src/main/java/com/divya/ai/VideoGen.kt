@@ -19,6 +19,8 @@ import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -61,23 +63,25 @@ object VideoGen {
     private const val DW = 720f   // design space (drawing coordinates)
     private const val DH = 1280f
 
-    class Scene(val speak: String, val caption: String, val query: String)
-    class Plan(val title: String, val scenes: List<Scene>)
+    class Scene(val speak: String, val caption: String, val query: String, val img: String = "")
+    class Plan(val title: String, val scenes: List<Scene>, val character: String = "")
     class Result(val path: String, val title: String, val seconds: Int, val scenes: Int, val visuals: String)
     private class Pcm(val sr: Int, val s: ShortArray)
     class Live(val renderer: Renderer, val total: Double, val startNs: Long) { var track: AudioTrack? = null }
 
+    @Volatile private var imgErr = ""
+    private val imgHttp = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(75, TimeUnit.SECONDS).build()
     private val http = OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS).build()
 
     fun dir(c: Context): File = (c.getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: File(c.filesDir, "videos")).also { it.mkdirs() }
     fun list(c: Context): List<File> = dir(c).listFiles { f -> f.extension == "mp4" }?.sortedByDescending { it.lastModified() } ?: emptyList()
 
     /** UI aur voice dono yahin se. Result string Live model ko jata hai ("done: ..." / "failed: ..."). */
-    fun createTracked(c: Context, topic: String, lang: String, secs: Int, style: String, script: String = "", captions: String = ""): String {
+    fun createTracked(c: Context, topic: String, lang: String, secs: Int, style: String, script: String = "", captions: String = "", visuals: String = "ai"): String {
         if (VideoBus.busy) return "failed: ek video pehle se ban rahi hai, thoda ruko."
         VideoBus.busy = true; VideoBus.error = null; VideoBus.stage = "Shuru…"
         return try {
-            val r = create(c, topic, lang, secs, style, script, captions) { s -> VideoBus.stage = s; BgTasks.stage(s) }
+            val r = create(c, topic, lang, secs, style, script, captions, visuals) { s -> VideoBus.stage = s; BgTasks.stage(s) }
             VideoBus.lastPath = r.path
             "done: video '${r.title}' ready (${r.seconds} sec, ${r.scenes} scenes, visuals: ${r.visuals}). Phone mein Movies/DivyaVideos mein save hai aur Video screen mein dikh rahi hai - wahan se Share kar sakte ho."
         } catch (e: Throwable) {
@@ -90,25 +94,36 @@ object VideoGen {
         }
     }
 
-    fun create(c: Context, topic: String, lang: String, secs: Int, style: String, script: String, captions: String, onStage: (String) -> Unit): Result {
+    fun create(c: Context, topic: String, lang: String, secs: Int, style: String, script: String, captions: String, visuals: String, onStage: (String) -> Unit): Result {
         require(topic.isNotBlank()) { "Topic khali hai" }
         val t0 = System.currentTimeMillis()
         val seconds = secs.coerceIn(10, 60)
         val isEn = lang.startsWith("en", true)
-        val plan = localPlan(topic.trim(), script, captions) ?: run { onStage("Script likh rahi hoon…"); plan(c, topic.trim(), isEn, seconds, style) }
+        val ai = visuals != "fast"
+        imgErr = ""
+        val plan = (if (!ai) localPlan(topic.trim(), script, captions) else null) ?: run { onStage(if (ai) "Kahani aur scenes likh rahi hoon…" else "Script likh rahi hoon…"); writePlan(c, topic.trim(), isEn, seconds, style, ai) }
 
-        // visuals background threads mein, TTS saath-saath
-        val pexels = c.getSharedPreferences("divya", 0).getString("pexelsKey", "")?.trim() ?: ""
-        val pool = Executors.newFixedThreadPool(3)
+        // visuals background threads mein (AI images ya photos), TTS saath-saath
+        val prefs = c.getSharedPreferences("divya", 0)
+        val pexels = prefs.getString("pexelsKey", "")?.trim() ?: ""
+        val src = prefs.getString("vgImg", "auto") ?: "auto"
+        val seed = (System.currentTimeMillis() % 90000).toInt() + 1000
+        val pool = Executors.newFixedThreadPool(if (ai) 4 else 3)
         val used = java.util.Collections.synchronizedSet(mutableSetOf<Long>())
-        val futs: List<Future<Bitmap?>> = plan.scenes.map { s -> pool.submit<Bitmap?> { if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used) } }
+        val futs: List<Future<Bitmap?>> = plan.scenes.mapIndexed { i, s ->
+            pool.submit<Bitmap?> { if (ai) aiImage(c, plan, s, seed, src, pexels, used) else if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used) }
+        }
 
         onStage("Awaaz bana rahi hoon…")
         val voices = try { synth(c, plan.scenes, isEn) } catch (e: Throwable) { pool.shutdownNow(); throw e }
-        onStage("Visuals ready kar rahi hoon…")
-        val dl = System.currentTimeMillis() + 1500
-        val bmps = futs.map { try { it.get(max(1L, dl - System.currentTimeMillis()), TimeUnit.MILLISECONDS) } catch (_: Exception) { null } }
-        pool.shutdown()
+        val dl = System.currentTimeMillis() + (if (ai) 70_000L else 1_500L)
+        while (futs.any { !it.isDone } && System.currentTimeMillis() < dl) {
+            if (ai) onStage("AI images ban rahi hain… ${futs.count { it.isDone }}/${futs.size}")
+            try { Thread.sleep(250) } catch (_: InterruptedException) { break }
+        }
+        val raw = futs.map { if (it.isDone) try { it.get() } catch (_: Exception) { null } else null }
+        pool.shutdownNow()
+        val bmps = fillGaps(raw)
 
         val sr = voices.first().sr
         val lead = (sr * 0.12).toInt(); val tail = (sr * 0.30).toInt()
@@ -138,7 +153,7 @@ object VideoGen {
         onStage("Video encode ho rahi hai…")
         var audioErr: Throwable? = null
         val aThread = Thread { try { encodeAudio(audio, sr, tmpA) } catch (e: Throwable) { audioErr = e } }.also { it.start() }
-        val visuals = if (bmps.any { it != null }) "photos" else "neon animated"
+        val visualsTxt = if (bmps.any { it != null }) (if (ai) "AI images" else "photos") else (if (ai) "neon (AI image nahi bani: $imgErr)" else "neon animated")
         encodeVideo(plan, bmps, starts, durs, speakDur, totalSec, tmpV) { p -> onStage("Video encode… ${(p * 100).toInt()}%") }
 
         aThread.join(); audioErr?.let { throw it }
@@ -154,7 +169,7 @@ object VideoGen {
         val rem = ((totalSec * 1e9 - (System.nanoTime() - live.startNs)) / 1e6).toLong().coerceIn(0, 60_000)
         if (rem > 0) try { Thread.sleep(rem) } catch (_: InterruptedException) {}
         Log.i(TAG, "video ready in ${(System.currentTimeMillis() - t0) / 1000.0}s")
-        return Result(out.absolutePath, plan.title, totalSec.toInt(), plan.scenes.size, visuals)
+        return Result(out.absolutePath, plan.title, totalSec.toInt(), plan.scenes.size, visualsTxt)
     }
 
     // ------------------------------------------------------------------ SCRIPT
@@ -166,13 +181,20 @@ object VideoGen {
         return Plan(topic.take(40).ifBlank { "Video" }, sp.mapIndexed { i, t -> Scene(t, cp.getOrNull(i)?.takeIf { it.isNotEmpty() } ?: t, topic) })
     }
 
-    private fun plan(c: Context, topic: String, en: Boolean, seconds: Int, style: String): Plan {
-        val n = (seconds / 6).coerceIn(2, 7)
+    private fun writePlan(c: Context, topic: String, en: Boolean, seconds: Int, style: String, ai: Boolean): Plan {
+        val n = if (ai) (seconds / 5).coerceIn(3, 12) else (seconds / 6).coerceIn(2, 7)
         val words = (seconds * if (en) 2.4 else 2.2).toInt()
         val sys = "You write scripts for short vertical social videos (Reels/Shorts). Reply ONLY with JSON."
         val langRule = if (en) "Narration in simple spoken English. caption = same text as speak."
         else "speak = narration in HINDI written in DEVANAGARI script (natural spoken Hindi, simple words, a little English words allowed in Devanagari). caption = the SAME sentence written in Hinglish (Roman letters) for subtitles."
-        val user = """Topic: $topic
+        val user = if (ai) """Topic / story idea: $topic
+Make a CINEMATIC STORY style short video (like a viral AI-generated story reel with a consistent main character).
+Make exactly $n scenes of about 5 seconds each, about $words words of narration in total.
+$langRule
+"character" = ONE detailed English visual description of the main character(s), identical in every scene (species/age/clothes/colours/accessories, e.g. "a cute white lion cub wearing a white linen shirt and a thin gold chain"). Use "" if there is no character.
+Each scene "image" = a detailed English prompt for a PHOTOREALISTIC cinematic still: camera angle, location, lighting, what the character is doing. Vary the shots (wide, close-up, over-the-shoulder, aerial). Always mention the character. No text, logos or captions inside the image.
+Scene 1 = strong hook. Last scene = short ending / follow-like call to action.
+JSON format: {"title":"short title (max 6 words)","character":"...","scenes":[{"speak":"...","caption":"...","image":"..."}]}""" else """Topic: $topic
 Style: ${style.ifBlank { "facts" }}
 Make exactly $n scenes, about $words words of narration in total (about $seconds seconds when spoken).
 $langRule
@@ -187,10 +209,71 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
         val scenes = (0 until arr.length()).mapNotNull {
             val o = arr.optJSONObject(it) ?: return@mapNotNull null
             val sp = o.optString("speak").trim()
-            if (sp.isBlank()) null else Scene(sp, o.optString("caption").trim().ifBlank { sp }, o.optString("query").trim().ifBlank { topic })
+            if (sp.isBlank()) null else { val im = o.optString("image").trim(); Scene(sp, o.optString("caption").trim().ifBlank { sp }, o.optString("query").trim().ifBlank { im.take(60).ifBlank { topic } }, im) }
         }
         if (scenes.isEmpty()) throw CodeGen.GenError("Script khali aayi, dobara try karo.")
-        return Plan(j.optString("title", topic).take(60).ifBlank { topic.take(40) }, scenes)
+        return Plan(j.optString("title", topic).take(60).ifBlank { topic.take(40) }, scenes, j.optString("character").trim())
+    }
+
+    // ------------------------------------------------------------------ AI IMAGES
+    private fun fillGaps(l: List<Bitmap?>): List<Bitmap?> {
+        if (l.all { it == null }) return l
+        return l.mapIndexed { i, b -> b ?: ((i - 1 downTo 0).firstNotNullOfOrNull { l[it] } ?: l.firstNotNullOf { it }) }
+    }
+
+    private fun decodeBmp(b0: ByteArray): Bitmap? {
+        val bm = BitmapFactory.decodeByteArray(b0, 0, b0.size) ?: return null
+        return if (bm.height > 1100) Bitmap.createScaledBitmap(bm, bm.width * 1100 / bm.height, 1100, true).also { if (it !== bm) bm.recycle() } else bm
+    }
+
+    private fun buildPrompt(ch: String, s: Scene): String {
+        val base = s.img.ifBlank { s.query }
+        val withCh = if (ch.isNotBlank() && !base.contains(ch.take(18), true)) "$base, $ch" else base
+        return (withCh + ", photorealistic cinematic still, ultra detailed, natural lighting, sharp focus, 9:16 vertical, no text, no watermark").take(900)
+    }
+
+    /** Auto: Pollinations (free, bina key) -> Gemini image (aapki key) -> Pexels photo. */
+    private fun aiImage(c: Context, plan: Plan, s: Scene, seed: Int, src: String, pexels: String, used: MutableSet<Long>): Bitmap? {
+        val prompt = buildPrompt(plan.character, s)
+        val order = when (src) { "pollinations" -> listOf("p"); "gemini" -> listOf("g"); "pexels" -> listOf("x"); else -> listOf("p", "g", "x") }
+        for (o in order) {
+            val b = try {
+                when (o) { "p" -> pollinations(prompt, seed); "g" -> geminiImage(c, prompt); else -> if (pexels.isBlank()) null else fetchPhoto(pexels, s.query, used) }
+            } catch (e: Exception) { imgErr = "$o: ${e.message}"; Log.w(TAG, "image $o: ${e.message}"); null }
+            if (b != null) return b
+        }
+        return null
+    }
+
+    private fun pollinations(prompt: String, seed: Int): Bitmap? {
+        for (attempt in 0..1) {
+            val url = "https://image.pollinations.ai/prompt/" + java.net.URLEncoder.encode(prompt, "UTF-8").replace("+", "%20") +
+                "?width=720&height=1280&model=flux&nologo=true&seed=${seed + attempt}"
+            val bytes = imgHttp.newCall(Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 DivyaAI").build()).execute().use { r ->
+                if (!r.isSuccessful) { imgErr = "pollinations ${r.code}"; null } else r.body?.bytes()
+            }
+            if (bytes != null && bytes.size > 5000) decodeBmp(bytes)?.let { return it }
+        }
+        return null
+    }
+
+    private fun geminiImage(c: Context, prompt: String): Bitmap? {
+        val pr = c.getSharedPreferences("divya", 0)
+        val key = pr.getString("key", "") ?: ""; if (key.isBlank()) return null
+        val model = pr.getString("imgModel", "gemini-2.5-flash-image") ?: "gemini-2.5-flash-image"
+        val body = JSONObject()
+            .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", prompt)))))
+            .put("generationConfig", JSONObject().put("responseModalities", JSONArray().put("IMAGE")).put("imageConfig", JSONObject().put("aspectRatio", "9:16")))
+            .toString()
+        val req = Request.Builder().url("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent").header("x-goog-api-key", key)
+            .post(body.toRequestBody("application/json".toMediaType())).build()
+        val txt = imgHttp.newCall(req).execute().use { r -> if (!r.isSuccessful) { imgErr = "gemini ${r.code}"; null } else r.body?.string() } ?: return null
+        val parts = JSONObject(txt).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: return null
+        for (i in 0 until parts.length()) {
+            val d = parts.getJSONObject(i).optJSONObject("inlineData")?.optString("data")
+            if (!d.isNullOrBlank()) return decodeBmp(android.util.Base64.decode(d, android.util.Base64.DEFAULT))
+        }
+        return null
     }
 
     // ------------------------------------------------------------------ PHOTOS (Pexels, optional)
@@ -375,7 +458,7 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
         val chunks: List<List<String>> = plan.scenes.map { chunk(it.caption) }
         val layouts = HashMap<String, Pair<StaticLayout, StaticLayout>>()
         val palette = intArrayOf(0xFF0B3D91.toInt(), 0xFF6A1B9A.toInt(), 0xFF00695C.toInt(), 0xFFB71C1C.toInt(), 0xFFEF6C00.toInt(), 0xFF283593.toInt(), 0xFF004D40.toInt(), 0xFF880E4F.toInt())
-        val grad = LinearGradient(0f, DH * 0.45f, 0f, DH.toFloat(), 0x00000000, 0xDD000000.toInt(), Shader.TileMode.CLAMP)
+        val grad = LinearGradient(0f, DH * 0.5f, 0f, DH.toFloat(), 0x00000000, 0xAA000000.toInt(), Shader.TileMode.CLAMP)
         val gradTop = LinearGradient(0f, 0f, 0f, DH * 0.2f, 0x99000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
 
         fun chunk(t: String): List<String> {
@@ -399,11 +482,15 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
             val prog = (local / dur).coerceIn(0.0, 1.0).toFloat()
             val bmp = bmps[si]
             if (bmp != null && !bmp.isRecycled) drawPhoto(cv, bmp, prog, si) else drawNeon(cv, t.toFloat(), si)
-            p.shader = grad; cv.drawRect(0f, DH * 0.45f, DW.toFloat(), DH.toFloat(), p)
+            if (bmp != null && si + 1 < bmps.size && dur - local < 0.4) { // crossfade agle scene ki image mein
+                val nb = bmps[si + 1]
+                if (nb != null && nb !== bmp) { p.alpha = (255 * (1 - (dur - local) / 0.4)).toInt().coerceIn(0, 255); drawPhoto(cv, nb, 0f, si + 1); p.alpha = 255 }
+            }
+            p.shader = grad; cv.drawRect(0f, DH * 0.5f, DW.toFloat(), DH.toFloat(), p)
             p.shader = gradTop; cv.drawRect(0f, 0f, DW.toFloat(), DH * 0.2f, p); p.shader = null
 
             cv.drawText("DIVYA AI", 36f, 70f, wmP)
-            if (t < 2.8 && si == 0) { // title pill
+            if (t < 2.8 && si == 0 && bmps[0] == null) { // title pill (sirf neon background par)
                 val a = (min(1.0, (2.8 - t) / 0.4)).toFloat()
                 val tl = StaticLayout.Builder.obtain(plan.title, 0, plan.title.length, titleP, (DW - 160).toInt()).setAlignment(Layout.Alignment.ALIGN_CENTER).setMaxLines(2).build()
                 p.color = gold; p.alpha = (255 * a).toInt()
@@ -429,7 +516,7 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
                 strokeL.draw(cv); fillL.draw(cv); cv.restore()
             }
             // scene fade-in
-            if (local < 0.25 && si > 0) { p.color = Color.BLACK; p.alpha = (255 * (1 - local / 0.25)).toInt(); cv.drawRect(0f, 0f, DW.toFloat(), DH.toFloat(), p); p.alpha = 255 }
+            if (local < 0.25 && si > 0 && bmp == null) { p.color = Color.BLACK; p.alpha = (255 * (1 - local / 0.25)).toInt(); cv.drawRect(0f, 0f, DW.toFloat(), DH.toFloat(), p); p.alpha = 255 }
             if (t < 0.3) { p.color = Color.BLACK; p.alpha = (255 * (1 - t / 0.3)).toInt(); cv.drawRect(0f, 0f, DW.toFloat(), DH.toFloat(), p); p.alpha = 255 }
         }
 
@@ -437,10 +524,11 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
             val target = DW.toFloat() / DH
             var cw = b.width.toFloat(); var chh = cw / target
             if (chh > b.height) { chh = b.height.toFloat(); cw = chh * target }
-            val zoom = 1f + 0.14f * prog
+            val pz = if (si % 2 == 0) prog else 1f - prog
+            val zoom = 1f + 0.18f * pz
             val vw = cw / zoom; val vh = chh / zoom
             val dir = if (si % 2 == 0) 1f else -1f
-            val cx = b.width / 2f + dir * (cw - vw) * (prog - 0.5f) * 0.8f
+            val cx = b.width / 2f + dir * (cw - vw) * (pz - 0.5f) * 0.8f
             val cy = b.height / 2f
             val src = Rect((cx - vw / 2).toInt().coerceIn(0, b.width - 1), (cy - vh / 2).toInt().coerceIn(0, b.height - 1),
                 (cx + vw / 2).toInt().coerceIn(1, b.width), (cy + vh / 2).toInt().coerceIn(1, b.height))
