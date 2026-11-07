@@ -46,7 +46,7 @@ class GeminiLive(
     private var gen = 0                       // har naye socket ki id: purane socket ke callbacks ignore karne ke liye
     private var fastThink = true               // sirf 2.5 models: "thinking" band (thinkingBudget=0). 3.x models mein ye field bheja hi nahi jata
     private var blockingTools = true           // gemini-3.8-live: tool call purane tareeke se (jawab tool ke result ke baad) - behavior=BLOCKING
-    private var nativeSearch = true            // Live model ki apni Google Search (tool call ke bina, ek hi turn mein) - fail ho to band
+    private var nativeSearch = false           // Live model ki apni Google Search (tool call ke bina, ek hi turn mein) - fail ho to band
     private var compress = true                // contextWindowCompression: audio+video session 2 min mein kat jata hai, isse lamba chalta hai
     var screenShare by mutableStateOf(false)   // live screen sharing ON/OFF (har naye session mein OFF se shuru)
     @Volatile private var shareThread: Thread? = null
@@ -186,6 +186,7 @@ class GeminiLive(
         if (!LicenseGate.isActive(ctx)) { state("Error: License activate karo"); return }
         lastKey = key; lastModel = model; lastVoice = voice
         fastThink = ctx.getSharedPreferences("divya", 0).getBoolean("fastThink", true)
+        nativeSearch = ctx.getSharedPreferences("divya", 0).getBoolean("nativeSearchOn", false)   // experimental, default OFF
         ready = false; running = true; endAfter = false; heard.setLength(0); WakeBus.liveActive = true; lastAct = System.currentTimeMillis(); mic = withMic; pending = firstText; newTurn = true
         state("Connecting…")
         PhoneTools.prefetchNews(ctx)
@@ -208,7 +209,7 @@ class GeminiLive(
     private fun failed(msg: String, code: Int) {
         if (!ready && running && (code == 1007 || code == 1008)) {
             var retry = false
-            if (nativeSearch) { nativeSearch = false; retry = true }
+            if (nativeSearch) { nativeSearch = false; ctx.getSharedPreferences("divya", 0).edit().putBoolean("nativeSearchOn", false).apply(); retry = true }
             else if (compress) { compress = false; retry = true }
             else if (blockingTools && lastModel == "gemini-3.8-live") { blockingTools = false; retry = true }
             else if (fastThink && lastModel.contains("2.5")) {
@@ -259,7 +260,31 @@ class GeminiLive(
         .put("inputAudioTranscription", JSONObject())
         .put("tools", JSONArray().put(JSONObject().put("functionDeclarations", toolDecls())).also { if (nativeSearch) it.put(JSONObject().put("googleSearch", JSONObject())) })).toString()
 
+    // ---- Watchdog: session "Online" dikhe par model chup rahe (na sunna, na reply) to apne-aap theek karo ----
+    @Volatile private var awaitAt = 0L
+
+    private fun armWatchdog(text: String?) {
+        val mark = System.currentTimeMillis(); awaitAt = mark
+        main.postDelayed({ if (running && ready && awaitAt == mark) onSilent(text) }, 11_000)
+    }
+
+    private fun onSilent(text: String?) {
+        awaitAt = 0L
+        val sp = ctx.getSharedPreferences("divya", 0)
+        when {
+            nativeSearch -> { nativeSearch = false; sp.edit().putBoolean("nativeSearchOn", false).apply(); reconnect(text) }
+            lastModel.startsWith("gemini-3.") && !fellBack -> { fellBack = true; lastModel = OLD_MODEL; reconnect(text) }
+            else -> { main.post { onText("⚠ Divya ne jawab nahi diya. Check karo: Gemini API key sahi hai? quota/limit khatam to nahi? internet chal raha hai? (Settings > Manage API)", true) }; state("Jawab nahi aaya - key/quota/net check karo") }
+        }
+    }
+
+    private fun reconnect(text: String?) {
+        stop("Dobara jud rahi hoon…")
+        main.postDelayed({ if (!running) start(lastKey, lastModel, lastVoice, mic, text) }, 500)
+    }
+
     fun sendText(t: String) {
+        armWatchdog(t)
         ws?.send(JSONObject().put("clientContent", JSONObject()
             .put("turns", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", t)))))
             .put("turnComplete", true)).toString())
@@ -282,7 +307,10 @@ class GeminiLive(
                 initAudio(); pending?.let { sendText(it) }; pending = null
                 if (mic) startMic()
             }
+            j.optJSONObject("error")?.let { e -> main.post { onText("⚠ Gemini error: " + e.optString("message").take(160), true) } }
+            if (j.has("goAway")) state("Server session badal raha hai…")
             j.optJSONObject("serverContent")?.let { sc ->
+                if (sc.has("modelTurn") || sc.has("outputTranscription") || sc.optBoolean("turnComplete")) awaitAt = 0L
                 if (sc.optBoolean("interrupted")) { clearPlayback(); AvatarBus.level = 0f; AvatarBus.speaking = false }
                 sc.optJSONObject("modelTurn")?.optJSONArray("parts")?.let { ps ->
                     for (i in 0 until ps.length()) {
@@ -293,7 +321,7 @@ class GeminiLive(
                 sc.optJSONObject("outputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let {
                     val n = newTurn; newTurn = false; AvatarBus.say(if (n) it else AvatarBus.caption + it); main.post { onText(it, n) }
                 }
-                sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let { AvatarBus.moveTo(2); main.post { onHeard(it) }; heard.append(it).append(' '); AvatarBus.say(heard.toString().trim()); if (SessionControl.isStop(heard.toString().takeLast(60))) requestEnd()
+                sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let { AvatarBus.moveTo(2); armWatchdog(null); main.post { onHeard(it) }; heard.append(it).append(' '); AvatarBus.say(heard.toString().trim()); if (SessionControl.isStop(heard.toString().takeLast(60))) requestEnd()
                         else if (PhoneTools.canCancelInstall() && Regex("(install|download|डाउनलोड|इंस्टॉल).{0,25}(cancel|कैंसल|band|bandh|बंद|rok|रोक|stop)|(cancel|कैंसल|band|बंद|rok|रोक|stop).{0,15}(install|download|डाउनलोड|इंस्टॉल)", RegexOption.IGNORE_CASE).containsMatchIn(it.lowercase())) bgPool.execute { BgTasks.cancelAll(); PhoneTools.cancelInstall(ctx) } }
                 if (sc.optBoolean("turnComplete")) {
                     newTurn = true; heard.setLength(0)
@@ -302,7 +330,7 @@ class GeminiLive(
                     main.postDelayed({ if (AvatarBus.stage == 5) AvatarBus.moveTo(if (micOn) 1 else 0) }, 1500)
                 }
             }
-            j.optJSONObject("toolCall")?.optJSONArray("functionCalls")?.let { runTools(it) }
+            j.optJSONObject("toolCall")?.optJSONArray("functionCalls")?.let { awaitAt = 0L; runTools(it) }
         } catch (e: Exception) { state("Error: ${e.message}") }
     }
 
