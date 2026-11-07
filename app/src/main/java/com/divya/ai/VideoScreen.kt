@@ -40,6 +40,7 @@ fun VideoGenScreen(th: UiTheme, ctx: Context) {
     var sel by remember { mutableStateOf(VideoBus.lastPath) }
     var tick by remember { mutableStateOf(0) }
     var pexels by remember { mutableStateOf(prefs.getString("pexelsKey", "") ?: "") }
+    var voiceSel by remember { mutableStateOf(if (prefs.getBoolean("vgPhoneVoice", false)) "phone" else (prefs.getString("vgVoiceName", "") ?: "").ifBlank { "auto" }) }
     LaunchedEffect(VideoBus.lastPath) { VideoBus.lastPath?.let { sel = it; tick++ } }
     fun toast(t: String) = Toast.makeText(ctx, t, Toast.LENGTH_SHORT).show()
 
@@ -160,7 +161,15 @@ fun VideoGenScreen(th: UiTheme, ctx: Context) {
                 OutlinedTextField(pexels, { pexels = it }, Modifier.fillMaxWidth(), label = { Text("Pexels API key") }, singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = th.text, unfocusedTextColor = th.text))
                 Btn(th, "Save") { prefs.edit().putString("pexelsKey", pexels.trim()).apply(); toast("Save ho gaya") }
-                Text("Awaaz: phone ka Google Text-to-speech use hota hai. Hindi awaaz ke liye Settings > Text-to-speech mein Hindi voice download rakho.\nScript ke liye wahi Gemini API key (Settings) chalti hai.", color = th.text.copy(alpha = 0.6f), fontSize = 12.sp)
+                Text("Video ki awaaz", color = th.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                val setVoice = { v: String ->
+                    voiceSel = v
+                    prefs.edit().putBoolean("vgPhoneVoice", v == "phone").putString("vgVoiceName", if (v == "auto" || v == "phone") "" else v).apply()
+                }
+                Chips(listOf("auto" to "Auto (style ke hisab se)", "phone" to "Phone (robot)"), voiceSel, setVoice)
+                Chips(listOf("Puck" to "Puck mazedaar", "Fenrir" to "Fenrir josh", "Algenib" to "Algenib gehri"), voiceSel, setVoice)
+                Chips(listOf("Aoede" to "Aoede naram", "Kore" to "Kore pakki", "Charon" to "Charon samjhane wali"), voiceSel, setVoice)
+                Text("Auto = funny me Puck, attitude me Algenib, sad me Aoede, baaki me Fenrir. Ye awaazein Gemini TTS se aati hain (wahi API key, 1-3 sec zyada lagte hain). Gemini na chale to phone ki awaaz apne aap chalti hai.", color = th.text.copy(alpha = 0.6f), fontSize = 12.sp)
             }
         }
     }

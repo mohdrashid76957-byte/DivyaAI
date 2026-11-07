@@ -122,7 +122,7 @@ object VideoGen {
         }
 
         onStage("Awaaz bana rahi hoon…")
-        val voices = try { synth(c, plan.scenes, isEn) } catch (e: Throwable) { pool.shutdownNow(); throw e }
+        val voices = try { synth(c, plan.scenes, isEn, if (plan.style.isNotBlank()) plan.style else style.lowercase()) } catch (e: Throwable) { pool.shutdownNow(); throw e }
         // Preview shuru karne se pehle sirf PEHLI image ka thoda intezaar (max 4 sec). Baaki images video chalte-chalte aati rahengi.
         val firstDl = System.currentTimeMillis() + (if (ai) 4_000L else 1_500L)
         while (System.currentTimeMillis() < firstDl && (if (ai) !futs[0].isDone else futs.any { !it.isDone })) {
@@ -311,7 +311,86 @@ JSON format: {"title":"short title (max 6 words)","scenes":[{"speak":"...","capt
     } catch (e: Exception) { Log.w(TAG, "pexels: ${e.message}"); null }
 
     // ------------------------------------------------------------------ TTS
-    private fun synth(c: Context, scenes: List<Scene>, en: Boolean): List<Pcm> {
+    // ---- Natural "viral" awaaz: Gemini TTS (phone ki robot awaaz se bahut behtar). Fail ho to phone TTS chalti hai. ----
+    private val ttsHttp = OkHttpClient.Builder().connectTimeout(6, TimeUnit.SECONDS).readTimeout(14, TimeUnit.SECONDS).build()
+
+    /** style -> (awaaz ka naam, bolne ka andaaz). Pref "vgVoiceName" se awaaz badal sakte ho (Puck, Fenrir, Charon, Kore, Aoede, Leda, Zephyr, Algenib, Orus). */
+    private fun voiceFor(style: String, en: Boolean): Pair<String, String> {
+        val s = style.lowercase()
+        val lang = if (en) "English" else "Hindi"
+        return when {
+            s.contains("funny") || s.contains("meme") || s.contains("roast") ->
+                "Puck" to "Say in $lang like a fun, energetic viral Reels creator: fast, playful, with comic timing, a laugh in the voice and punchy emphasis"
+            s.contains("attitude") || s.contains("badmash") || s.contains("swag") ->
+                "Algenib" to "Say in $lang in a deep, confident, bold swag voice: slow, heavy, punchy, with short dramatic pauses, like a movie villain-hero"
+            s.contains("sad") || s.contains("shayari") || s.contains("status") ->
+                "Aoede" to "Say in $lang softly and emotionally, slow and heavy-hearted, with gentle pauses"
+            s.contains("motiv") ->
+                "Fenrir" to "Say in $lang like a powerful motivational speaker: intense, rising energy, strong emphasis on key words"
+            else ->
+                "Fenrir" to "Say in $lang like a gripping storyteller who hooks the listener: excited, dramatic, curious, a pause before big reveals, crisp and clear"
+        }
+    }
+
+    private fun geminiVoice(c: Context, text: String, voice: String, direction: String): Pcm? {
+        val pr = c.getSharedPreferences("divya", 0)
+        val key = pr.getString("key", "")?.trim().orEmpty(); if (key.isBlank()) return null
+        val model = pr.getString("ttsModel", "gemini-2.5-flash-preview-tts") ?: "gemini-2.5-flash-preview-tts"
+        val vname = pr.getString("vgVoiceName", "")?.trim().orEmpty().ifBlank { voice }
+        val body = JSONObject()
+            .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", "$direction:\n$text")))))
+            .put("generationConfig", JSONObject().put("responseModalities", JSONArray().put("AUDIO"))
+                .put("speechConfig", JSONObject().put("voiceConfig", JSONObject().put("prebuiltVoiceConfig", JSONObject().put("voiceName", vname)))))
+            .toString()
+        for (attempt in 0..1) {
+            try {
+                val req = Request.Builder().url("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent").header("x-goog-api-key", key)
+                    .post(body.toRequestBody("application/json".toMediaType())).build()
+                val txt = ttsHttp.newCall(req).execute().use { r -> if (!r.isSuccessful) { imgErr = "tts ${r.code}"; null } else r.body?.string() } ?: continue
+                val parts = JSONObject(txt).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: continue
+                for (i in 0 until parts.length()) {
+                    val d = parts.getJSONObject(i).optJSONObject("inlineData")?.optString("data")
+                    if (!d.isNullOrBlank()) {
+                        val raw = android.util.Base64.decode(d, android.util.Base64.DEFAULT)
+                        val n = raw.size / 2
+                        val sh = ShortArray(n) { k -> ((raw[2 * k].toInt() and 0xFF) or (raw[2 * k + 1].toInt() shl 8)).toShort() }
+                        return polish(Pcm(24000, sh))
+                    }
+                }
+            } catch (e: Exception) { Log.w(TAG, "gemini tts: ${e.message}") }
+        }
+        return null
+    }
+
+    /** Shuru/ant ki khali awaaz hatao aur volume barabar (loud + clear) karo. */
+    private fun polish(p: Pcm): Pcm {
+        val s = p.s; if (s.isEmpty()) return p
+        val th = 600
+        var a = 0; while (a < s.size && Math.abs(s[a].toInt()) < th) a++
+        var b = s.size - 1; while (b > a && Math.abs(s[b].toInt()) < th) b--
+        val keep = (p.sr * 0.05).toInt()
+        val from = (a - keep).coerceAtLeast(0); val to = (b + keep).coerceAtMost(s.size - 1)
+        if (to <= from) return p
+        var peak = 1; for (i in from..to) peak = max(peak, Math.abs(s[i].toInt()))
+        val g = (30000.0 / peak).coerceIn(0.5, 4.0)
+        return Pcm(p.sr, ShortArray(to - from + 1) { i -> (s[from + i] * g).toInt().coerceIn(-32768, 32767).toShort() })
+    }
+
+    /** Saare scenes ki awaaz ek saath (parallel). Ek bhi fail ho to null -> poori video phone ki TTS se (awaaz mix na ho). */
+    private fun synth(c: Context, scenes: List<Scene>, en: Boolean, style: String): List<Pcm> {
+        if (c.getSharedPreferences("divya", 0).getBoolean("vgPhoneVoice", false)) return synthPhone(c, scenes, en)
+        val (voice, dir) = voiceFor(style, en)
+        val pool = Executors.newFixedThreadPool(min(6, scenes.size).coerceAtLeast(1))
+        try {
+            val fs = scenes.map { sc -> pool.submit<Pcm?> { geminiVoice(c, sc.speak, voice, dir) } }
+            val out = fs.map { try { it.get(25, TimeUnit.SECONDS) } catch (_: Exception) { null } }
+            if (out.all { it != null }) return out.map { it!! }
+        } finally { pool.shutdownNow() }
+        Log.w(TAG, "Gemini awaaz nahi bani (${imgErr}), phone TTS use ho rahi hai")
+        return synthPhone(c, scenes, en)
+    }
+
+    private fun synthPhone(c: Context, scenes: List<Scene>, en: Boolean): List<Pcm> {
         val ready = CountDownLatch(1); var ok = false
         val tts = TextToSpeech(c.applicationContext) { st -> ok = st == TextToSpeech.SUCCESS; ready.countDown() }
         if (!ready.await(10, TimeUnit.SECONDS) || !ok) { tts.shutdown(); throw CodeGen.GenError("Phone ka TTS (Google Text-to-speech) start nahi hua. Settings > Text-to-speech engine check karo.") }
