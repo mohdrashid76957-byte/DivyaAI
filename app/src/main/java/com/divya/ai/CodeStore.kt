@@ -23,8 +23,8 @@ object CodeStore {
         "kt", "kts", "java", "gradle", "properties", "yml", "yaml", "toml", "ini", "cfg", "env", "example", "gitignore",
         "c", "cpp", "h", "hpp", "cs", "go", "rs", "php", "rb", "sql", "csv", "ts", "tsx", "jsx", "mjs", "vue", "svelte", "dart", "swift", "bat", "ps1", "lock", "pro", "cmake")
     private val allowedNames = setOf("dockerfile", "makefile", "license", "procfile", "gradlew", "jitpack")
-    private const val MAX_FILE = 300_000
-    private const val MAX_FILES = 150
+    private const val MAX_FILE = 1_000_000
+    private const val MAX_FILES = 500
 
     fun root(c: Context): File = File(c.filesDir, "projects").apply { mkdirs() }
 

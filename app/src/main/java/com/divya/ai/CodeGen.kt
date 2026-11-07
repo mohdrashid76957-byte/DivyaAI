@@ -125,6 +125,24 @@ object CodeGen {
     } catch (e: GenError) { Log.e(TAG, "buildWebsite", e); "failed: ${e.message}" }
     catch (e: Exception) { Log.e(TAG, "buildWebsite", e); "failed: ${e.javaClass.simpleName}: ${e.message}" }
 
+    /** INSTANT website (~0.1 sec): template mein user ka data bhar ke save. onReady = turant preview kholne ke liye (publish peeche chalta hai). */
+    fun buildInstantSite(c: Context, a: JSONObject, onReady: (String) -> Unit): String = try {
+        val spec = SiteTemplates.specFrom(a)
+        var name = CodeStore.safeName(spec.name)
+        if (CodeStore.listProjects(c).contains(name)) name += "-" + (System.currentTimeMillis() % 1000)
+        val files = SiteTemplates.render(spec)
+        files.forEach { (p, body) -> CodeStore.write(c, name, p, body)?.let { throw GenError(it) } }
+        val issues = CodeStore.lint(c, name)
+        onReady(name)
+        val deploy = a.optBoolean("deploy", true)
+        val live = if (deploy && Deploy.hasToken(c)) { BgTasks.stage("Live publish ho raha hai…"); Deploy.netlify(c, name) } else null
+        "done: instant website '$name' taiyar (${files.keys.joinToString()}), preview screen par khul gaya." +
+            (if (issues.isEmpty()) "" else " Issues: ${issues.joinToString("; ")}") +
+            (if (live != null) " ONLINE: $live" else if (deploy) " Online publish nahi hua: Netlify token set nahi hai (Settings > Website publish)." else "") +
+            " Badlav chahiye to edit_website('$name', ...) se turant badal sakte ho."
+    } catch (e: GenError) { Log.e(TAG, "instant", e); "failed: ${e.message}" }
+    catch (e: Exception) { Log.e(TAG, "instant", e); "failed: ${e.javaClass.simpleName}: ${e.message}" }
+
     private fun projectDump(c: Context, project: String, limit: Int = 120_000): String {
         val sb = StringBuilder()
         for (f in CodeStore.files(c, project)) {
