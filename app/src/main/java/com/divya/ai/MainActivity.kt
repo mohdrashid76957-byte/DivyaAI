@@ -269,6 +269,8 @@ fun DivyaApp(ctx: Context) {
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if (it) toggle() }
     val tapMic = { if (micOk(ctx)) toggle() else micLauncher.launch(Manifest.permission.RECORD_AUDIO) }
     fun sendChat(t: String) {
+        // "image bana do" jaisi baat Pro Chat mein jaati hai (wahi image banakar dikhati hai)
+        if (ImageGen.isRequest(t)) { ProBus.pending = t; screen = Screen.ProChat; return }
         msgs.add("You" to t)
         val offlineNow = !Net.online(ctx) || prefs.getBoolean("offlineOnly", false)
         if (live.running) live.sendText(t)
@@ -492,6 +494,20 @@ fun Btn(th: UiTheme, label: String, onClick: () -> Unit) =
 @Composable
 fun ChatScreen(th: UiTheme, msgs: List<Pair<String, String>>, online: Boolean, send: (String) -> Unit, openPro: () -> Unit = {}) {
     var t by remember { mutableStateOf("") }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+    val mainH = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
+    // Photo/video/PDF bhejna: Pro Chat mein jata hai (wahi Gemini ko file dekhata hai)
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) {
+            val note = t
+            Thread {
+                val list = ArrayList<PAtt>()
+                uris.take(5).forEach { u -> try { list.add(loadAtt(ctx, u)) } catch (e: Exception) { mainH.post { Toast.makeText(ctx, e.message ?: "File nahi khuli", Toast.LENGTH_LONG).show() } } }
+                if (list.isNotEmpty()) mainH.post { ProState.send(ctx, note.ifBlank { "Isko dekho aur batao ye kya hai." }, list); t = ""; openPro() }
+            }.start()
+        }
+    }
     val ls = androidx.compose.foundation.lazy.rememberLazyListState()
     LaunchedEffect(msgs.size, msgs.lastOrNull()?.second?.length ?: 0) { if (msgs.isNotEmpty()) ls.scrollToItem(msgs.lastIndex) }
     Column(Modifier.fillMaxSize().imePadding().padding(12.dp)) {
@@ -500,18 +516,26 @@ fun ChatScreen(th: UiTheme, msgs: List<Pair<String, String>>, online: Boolean, s
                 Text("Divya Chat", color = th.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text(if (online) "🟢 Online (Gemini Live)" else "🟠 Offline smart mode (bina internet)", color = th.text.copy(alpha = 0.6f), fontSize = 11.sp)
             }
+            IconButton({ clip.setText(androidx.compose.ui.text.AnnotatedString(msgs.joinToString("\n\n") { (if (it.first == "Divya") "Divya: " else "Aap: ") + it.second })); Toast.makeText(ctx, "Poori chat copy ho gayi", Toast.LENGTH_SHORT).show() }) { Icon(Icons.Filled.ContentCopy, "Poori chat copy", tint = th.accent) }
             TextButton(openPro) { Text("🚀 Pro Chat", color = th.accent) }
         }
         LazyColumn(Modifier.weight(1f), state = ls, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(msgs) { (who, txt) ->
                 val me = who != "Divya"
                 Box(Modifier.fillMaxWidth(), contentAlignment = if (me) Alignment.CenterEnd else Alignment.CenterStart) {
-                    Text(txt, color = th.text, modifier = Modifier.clip(RoundedCornerShape(14.dp))
-                        .background(th.accent.copy(alpha = if (me) 0.45f else 0.2f)).padding(10.dp))
+                    Column(horizontalAlignment = if (me) Alignment.End else Alignment.Start) {
+                        androidx.compose.foundation.text.selection.SelectionContainer {
+                            Text(txt, color = th.text, modifier = Modifier.clip(RoundedCornerShape(14.dp))
+                                .background(th.accent.copy(alpha = if (me) 0.45f else 0.2f)).padding(10.dp))
+                        }
+                        Text("📋 Copy", color = th.text.copy(alpha = 0.6f), fontSize = 11.sp,
+                            modifier = Modifier.clickable { clip.setText(androidx.compose.ui.text.AnnotatedString(txt)); Toast.makeText(ctx, "Copy ho gaya", Toast.LENGTH_SHORT).show() }.padding(horizontal = 6.dp, vertical = 3.dp))
+                    }
                 }
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton({ pick.launch("*/*") }) { Icon(Icons.Filled.AttachFile, "Photo/Video bhejo", tint = th.accent) }
             OutlinedTextField(t, { t = it }, Modifier.weight(1f), placeholder = { Text("Divya se chat karo…") },
                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = th.text, unfocusedTextColor = th.text))
             IconButton({ if (t.isNotBlank()) { send(t.trim()); t = "" } }) { Icon(Icons.Filled.Send, "Send", tint = th.accent) }

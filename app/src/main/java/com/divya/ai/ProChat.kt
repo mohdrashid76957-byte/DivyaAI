@@ -10,6 +10,7 @@ import android.util.Base64
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -29,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -55,6 +58,7 @@ class PMsg(val role: String, text: String = "", val atts: List<PAtt> = emptyList
     var project by mutableStateOf<String?>(null)     // is jawab se bana project (ZIP ke liye)
     var status by mutableStateOf("")                  // progress line (project banate waqt)
     var busy by mutableStateOf(false)
+    var images by mutableStateOf<List<java.io.File>>(emptyList())   // chat mein bani images
 }
 
 /** Chat ki halat app mein ek jagah rehti hai, screen badalne par bhi nahi jaati. */
@@ -81,6 +85,7 @@ object ProState {
                 val o = a.getJSONObject(i)
                 val m = PMsg(o.optString("r"), o.optString("t"))
                 o.optString("p").takeIf { it.isNotBlank() }?.let { p -> if (CodeStore.listProjects(c).contains(p)) m.project = p }
+                o.optString("i").takeIf { it.isNotBlank() }?.let { f -> java.io.File(f).takeIf { it.exists() }?.let { m.images = listOf(it) } }
                 msgs.add(m)
             }
         } catch (_: Exception) {}
@@ -90,7 +95,7 @@ object ProState {
         try {
             val a = JSONArray()
             msgs.takeLast(40).forEach { m ->
-                if (m.text.isNotBlank()) a.put(JSONObject().put("r", m.role).put("t", m.text.take(60_000)).put("p", m.project ?: ""))
+                if (m.text.isNotBlank()) a.put(JSONObject().put("r", m.role).put("t", m.text.take(60_000)).put("p", m.project ?: "").put("i", m.images.firstOrNull()?.absolutePath ?: ""))
             }
             c.getSharedPreferences("divya", 0).edit().putString("proChat", a.toString()).apply()
         } catch (_: Exception) {}
@@ -152,8 +157,26 @@ object ProState {
         val u = PMsg("user", text.trim(), atts)
         atts.firstOrNull { it.zipFile != null }?.let { at -> val it = at.zipFile!!; baseZip = it; c.getSharedPreferences("divya", 0).edit().putString("proBaseZip", it.absolutePath).putString("proBaseName", at.name).apply() }
         msgs.add(u)
+        if (atts.isEmpty() && ImageGen.isRequest(text)) { genImage(c, text); return }
         go(c, text.trim().startsWith("/project") || projectMode, text.trim().removePrefix("/project").trim())
         projectMode = false
+    }
+
+    /** "... ki image bana do" -> image ban kar chat mein dikhti hai. */
+    private fun genImage(c: Context, req: String) {
+        val m = PMsg("model"); m.busy = true; m.status = "image bana rahi hoon…"
+        msgs.add(m); busy = true; userStopped = false; startedAt = System.currentTimeMillis()
+        val ctx = c.applicationContext
+        Thread {
+            try {
+                val r = ImageGen.generate(ctx, req) { s -> main.post { m.status = s } }
+                main.post { m.images = listOf(r.file); m.text = "🖼️ Image ban gayi (${r.via}): " + ImageGen.cleanPrompt(req).take(120) }
+            } catch (e: Exception) {
+                main.post { m.text = "⚠️ ${e.message}" }
+            } finally {
+                main.post { m.busy = false; m.status = ""; busy = false; save(ctx) }
+            }
+        }.start()
     }
 
     fun regenerate(c: Context) {
@@ -343,7 +366,7 @@ private fun zipAtt(c: Context, uri: Uri, name: String): PAtt {
     return PAtt(name, "application/zip", null, head, f)
 }
 
-private fun loadAtt(c: Context, uri: Uri): PAtt {
+internal fun loadAtt(c: Context, uri: Uri): PAtt {
     val name = displayName(c, uri)
     val mime = c.contentResolver.getType(uri) ?: "application/octet-stream"
     try {
@@ -356,6 +379,13 @@ private fun loadAtt(c: Context, uri: Uri): PAtt {
             val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = s }) ?: throw AttErr("$name image nahi padh paya")
             val bo = java.io.ByteArrayOutputStream(); bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, bo)
             return PAtt(name, "image/jpeg", Base64.encodeToString(bo.toByteArray(), Base64.NO_WRAP), null)
+        }
+        if (mime.startsWith("video/") || mime.startsWith("audio/")) {
+            val len = try { c.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L } catch (_: Exception) { -1L }
+            if (len > 12_000_000) throw AttErr("$name bahut badi hai (video/audio 12MB tak, chhoti clip do)")
+            val vb = c.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: throw AttErr("$name khul nahi payi")
+            if (vb.size > 12_000_000) throw AttErr("$name bahut badi hai (video/audio 12MB tak, chhoti clip do)")
+            return PAtt(name, mime, Base64.encodeToString(vb, Base64.NO_WRAP), null)
         }
         val bytes = c.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: throw AttErr("$name khul nahi payi")
         if (mime == "application/pdf" || name.lowercase().endsWith(".pdf")) {
@@ -407,6 +437,7 @@ fun ProChatScreen(th: UiTheme, openCode: () -> Unit) {
                 Text("Divya Pro Chat", color = th.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text("v$ver" + (if (ProState.usedModel.isNotBlank()) "  •  ${ProState.usedModel}" else ""), color = th.text.copy(alpha = 0.5f), fontSize = 10.sp)
             }
+            IconButton({ clip.setText(AnnotatedString(msgs.joinToString("\n\n") { (if (it.role == "user") "Aap: " else "Divya: ") + it.text })); Toast.makeText(ctx, "Poori chat copy ho gayi", Toast.LENGTH_SHORT).show() }) { Icon(Icons.Filled.ContentCopy, "Poori chat copy", tint = th.accent) }
             IconButton({ ProState.newChat(ctx); input = ""; atts.clear() }) { Icon(Icons.Filled.Add, "Nayi chat", tint = th.accent) }
             IconButton({ showCfg = true }) { Icon(Icons.Filled.Settings, "Settings", tint = th.accent) }
         }
@@ -433,6 +464,7 @@ fun ProChatScreen(th: UiTheme, openCode: () -> Unit) {
                     Column(Modifier.fillMaxWidth(if (me) 0.88f else 1f).clip(RoundedCornerShape(14.dp))
                         .background(th.accent.copy(alpha = if (me) 0.42f else 0.16f)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         m.atts.forEach { Text("📎 ${it.name}", color = th.text.copy(alpha = 0.8f), fontSize = 11.sp) }
+                        m.images.forEach { f -> GenImage(th, f) }
                         if (m.text.isNotBlank()) SelectionContainer { if (me) Text(m.text, color = th.text, fontSize = 14.sp) else MdText(th, m.text) }
                         if (m.busy) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -441,6 +473,8 @@ fun ProChatScreen(th: UiTheme, openCode: () -> Unit) {
                             }
                         }
                     }
+                    if (me && m.text.isNotBlank()) IconButton({ clip.setText(AnnotatedString(m.text)); Toast.makeText(ctx, "Copy ho gaya", Toast.LENGTH_SHORT).show() }, Modifier.size(30.dp)) {
+                        Icon(Icons.Filled.ContentCopy, "Copy", tint = th.text.copy(alpha = 0.5f), modifier = Modifier.size(16.dp)) }
                     if (!me && !m.busy && m.text.isNotBlank()) {
                         Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.horizontalScroll(rememberScrollState())) {
                             IconButton({ clip.setText(AnnotatedString(m.text)); Toast.makeText(ctx, "Copy ho gaya", Toast.LENGTH_SHORT).show() }, Modifier.size(34.dp)) {
@@ -532,5 +566,24 @@ fun ProChatScreen(th: UiTheme, openCode: () -> Unit) {
                 Slider(cc, { cc = it }, valueRange = 1f..8f, steps = 6)
                 Text("Free API key par limit ~10 requests/min hoti hai, to 429 aaye to ise 1-2 rakho. Billing wali key par 6-8 tak.", fontSize = 11.sp)
             } })
+    }
+}
+
+
+@Composable
+private fun GenImage(th: UiTheme, f: java.io.File) {
+    val ctx = LocalContext.current
+    val bmp = remember(f.absolutePath) {
+        try {
+            val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            android.graphics.BitmapFactory.decodeFile(f.absolutePath, o)
+            var sm = 1; while (o.outWidth / sm > 1400 || o.outHeight / sm > 1400) sm *= 2
+            android.graphics.BitmapFactory.decodeFile(f.absolutePath, android.graphics.BitmapFactory.Options().apply { inSampleSize = sm })
+        } catch (_: Throwable) { null }
+    }
+    if (bmp != null) Image(bmp.asImageBitmap(), "Bani hui image", Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.FillWidth)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        AssistChip({ Toast.makeText(ctx, if (ImageGen.saveToGallery(ctx, f)) "Gallery mein save ho gayi" else "Ye Android purana hai - Share se save karo", Toast.LENGTH_SHORT).show() }, { Text("⬇️ Gallery", fontSize = 12.sp) })
+        AssistChip({ try { ImageGen.share(ctx, f) } catch (e: Exception) { Toast.makeText(ctx, "Share nahi hua: ${e.message}", Toast.LENGTH_LONG).show() } }, { Text("📤 Share", fontSize = 12.sp) })
     }
 }
