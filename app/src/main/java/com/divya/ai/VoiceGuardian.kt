@@ -55,6 +55,25 @@ object VoiceGuardian {
     /** Dashboard par "last suna gaya" dikhane ke liye. */
     var last by mutableStateOf<Speaker?>(null)
 
+    /** Aakhri baar owner ki awaaz (ya typed chat) kab mili. Auto-bye rokne ke liye use hota hai. */
+    @Volatile var lastOwnerAt = 0L
+
+    private fun guardOn(p: SharedPreferences): Boolean =
+        p.getBoolean("voiceLock", false) && p.getInt("vgMode", 1) >= 1 && owner(p) != null
+
+    /**
+     * Session band karne (end_session / bye signal) ki ijazat hai ya nahi.
+     * Guardian ON ho aur 8 sec mein owner ki awaaz na mili ho to signal shor / anjaan logon se aaya maana jata hai,
+     * isliye Divya khud bye bolkar band nahi hogi.
+     */
+    fun allowEnd(c: Context): Boolean {
+        val p = c.getSharedPreferences("divya", 0)
+        if (!guardOn(p)) return true
+        return System.currentTimeMillis() - lastOwnerAt < 8_000L
+    }
+
+    fun noteIgnoredEnd(c: Context) = log(c, "Auto-bye roka: owner ki awaaz nahi thi (anjaan/shor), session chalu raha")
+
     /** Ye tools "privileged" nahi hain (sirf code/website banane wale), baaki sab device-control/camera/screen/notification hain. */
     private val SAFE = setOf("list_projects", "list_schedules", "preview_website", "build_website", "build_project", "make_video", "edit_website", "generate_code", "end_session", "web_search", "get_weather", "open_google_search")
 

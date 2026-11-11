@@ -90,6 +90,10 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
     }
     val blue = Color(0xFF6FC3FF)
     val edge = Brush.horizontalGradient(listOf(th.accent, th.accent.copy(alpha = 0.55f)))
+    var outfitOpen by remember { mutableStateOf(false) }
+    var outfitTick by remember { mutableStateOf(0) }
+    val custom = remember(outfitTick) { Outfits.loadSelected(ctx) }
+    if (outfitOpen) OutfitDialog(th.accent, onChanged = { outfitTick++ }, onDismiss = { outfitOpen = false })
     val tiles = listOf(
         NeonTileData(Icons.Filled.Chat, "Chat with AI", "Ask Anything…", blue, false) { go(Screen.Chat) },
         NeonTileData(Icons.Filled.QrCodeScanner, "Scanner", "Scan QR / Docs", blue, true) { go(Screen.Scan) },
@@ -99,7 +103,8 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
         NeonTileData(Icons.Filled.GraphicEq, "Voice Changer", "Change Your Voice…", NeonPurple, false) { go(Screen.Settings) },
         NeonTileData(Icons.Filled.Star, "Video Gen AI", "Topic → Video in seconds", Color(0xFFFFC107), true) { go(Screen.VideoStudio) },
         NeonTileData(Icons.Filled.CleaningServices, "Files Cleaner", "Clean Junk Files…", blue, false) { cleaner() },
-        NeonTileData(Icons.Filled.FlashOn, "Quick Actions", "Shortcuts for you…", Color(0xFFFFC107), false) { go(Screen.Quick) }
+        NeonTileData(Icons.Filled.FlashOn, "Quick Actions", "Shortcuts for you…", Color(0xFFFFC107), false) { go(Screen.Quick) },
+        NeonTileData(Icons.Filled.Checkroom, "Outfit", "Divya ka look badlo", blue, false) { outfitOpen = true }
     )
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 48.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -116,7 +121,7 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
                 "Anime Neon" -> intArrayOf(R.drawable.divya_av_anime_listen, R.drawable.divya_av_anime_think, R.drawable.divya_av_anime_happy)
                 else -> null
             }
-            AvatarHero(th.img, faces, th.accent, Modifier.weight(1.05f).fillMaxHeight().clickable { onAvatar() })
+            AvatarHero(th.img, faces, th.accent, Modifier.weight(1.05f).fillMaxHeight().clickable { onAvatar() }, custom)
             Column(Modifier.weight(0.95f).padding(start = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 val hello = buildAnnotatedString {
                     append("Hello $callName! 👋\nI am ")
@@ -226,7 +231,7 @@ fun AboutScreen(th: UiTheme) {
 
 /** Avatar: Divya bolti hai to uski asli awaaz ki loudness se hilta, chamakta aur halka sir hilata hai. */
 @Composable
-fun AvatarHero(img: Int, faces: IntArray?, accent: Color, modifier: Modifier) {
+fun AvatarHero(img: Int, faces: IntArray?, accent: Color, modifier: Modifier, custom: androidx.compose.ui.graphics.ImageBitmap? = null) {
     val tr = rememberInfiniteTransition(label = "av")
     val f by tr.animateFloat(-1f, 1f, infiniteRepeatable(tween(2800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "f")
     val stage = AvatarBus.stage
@@ -246,7 +251,14 @@ fun AvatarHero(img: Int, faces: IntArray?, accent: Color, modifier: Modifier) {
             stage == 1 || stage == 2 -> faces[0]
             else -> img
         }
-        androidx.compose.animation.Crossfade(shown, animationSpec = tween(220), label = "expr") { res ->
+        if (custom != null) {
+            // User ka chuna hua outfit: is case mein lip-sync wali asli drawables ki jagah yahi image dikhti hai
+            Image(custom, "Divya", Modifier.fillMaxSize().graphicsLayer {
+                translationY = f * 5.dp.toPx() * (if (stage > 0) 1.6f else 1f)
+                val sc = 1f + 0.02f * smooth
+                scaleX = sc; scaleY = sc
+            }, contentScale = ContentScale.Fit)
+        } else androidx.compose.animation.Crossfade(shown, animationSpec = tween(220), label = "expr") { res ->
             val mod = Modifier.fillMaxSize().graphicsLayer {
                 translationY = f * 5.dp.toPx() * (if (stage > 0) 1.6f else 1f)
                 val sc = 1f + 0.02f * smooth

@@ -306,6 +306,7 @@ class GeminiLive(
     }
 
     fun sendText(t: String) {
+        VoiceGuardian.lastOwnerAt = System.currentTimeMillis()   // typed chat owner ki taraf se hai
         armWatchdog(t)
         ws?.send(JSONObject().put("clientContent", JSONObject()
             .put("turns", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", t)))))
@@ -344,7 +345,7 @@ class GeminiLive(
                 sc.optJSONObject("outputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let {
                     val n = newTurn; newTurn = false; AvatarBus.say(if (n) it else AvatarBus.caption + it); main.post { onText(it, n) }
                 }
-                sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let { AvatarBus.moveTo(2); armWatchdog(null); main.post { onHeard(it) }; heard.append(it).append(' '); AvatarBus.say(heard.toString().trim()); if (SessionControl.isStop(heard.toString().takeLast(60))) requestEnd()
+                sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotBlank() }?.let { AvatarBus.moveTo(2); armWatchdog(null); main.post { onHeard(it) }; heard.append(it).append(' '); AvatarBus.say(heard.toString().trim()); if (SessionControl.isStop(heard.toString().takeLast(60))) { if (VoiceGuardian.allowEnd(ctx)) requestEnd() else VoiceGuardian.noteIgnoredEnd(ctx) }
                         else if (PhoneTools.canCancelInstall() && Regex("(install|download|डाउनलोड|इंस्टॉल).{0,25}(cancel|कैंसल|band|bandh|बंद|rok|रोक|stop)|(cancel|कैंसल|band|बंद|rok|रोक|stop).{0,15}(install|download|डाउनलोड|इंस्टॉल)", RegexOption.IGNORE_CASE).containsMatchIn(it.lowercase())) bgPool.execute { BgTasks.cancelAll(); PhoneTools.cancelInstall(ctx) } }
                 if (sc.optBoolean("turnComplete")) {
                     newTurn = true; heard.setLength(0)
@@ -383,7 +384,7 @@ class GeminiLive(
                     val locked = (ctx.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager).isKeyguardLocked
                     val needUnlock = ctx.getSharedPreferences("divya", 0).getBoolean("needUnlock", true)
                     when (if (name == "end_session") "end_session" else if (dup) "__dup" else if (gate != null) "__voice" else if (needUnlock && locked) "__locked" else name) {
-                        "end_session" -> { requestEnd(); "ok. Ab bas 2-3 shabd mein chhota alvida bolo (jaise \"Theek hai, bye!\"). Koi aur tool mat chalao." }
+                        "end_session" -> if (!VoiceGuardian.allowEnd(ctx)) { VoiceGuardian.noteIgnoredEnd(ctx); "Session abhi band nahi ho rahi. Koi aur tool mat chalao, bas ek chhota sa jawab do ya chup raho." } else { requestEnd(); "ok. Ab bas 2-3 shabd mein chhota alvida bolo (jaise \"Theek hai, bye!\"). Koi aur tool mat chalao." }
                         "__dup" -> "already done a moment ago - DO NOT call this again. Just tell the user in a few words that it is done."
                         "__voice" -> gate ?: "blocked"
                         "__locked" -> "phone locked hai - user se kaho pehle phone unlock kare"

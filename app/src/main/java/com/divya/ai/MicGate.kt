@@ -105,7 +105,7 @@ class MicGate(private val ctx: Context) {
         VoiceGuardian.last = sp
         val mode = p.getInt("vgMode", 1)
         return when (sp.role) {
-            "owner" -> true
+            "owner" -> { VoiceGuardian.lastOwnerAt = System.currentTimeMillis(); true }
             "family" -> mode == 2
             else -> {
                 // thoda hysteresis: owner ki khansi/shor se ek baar score thoda upar jaye to na kato; saaf alag awaaz par kato
@@ -128,6 +128,7 @@ class MicGate(private val ctx: Context) {
         // "unverified" = bahut chhoti awaaz (verify nahi ho sakti): owner-only mein pass nahi karte
         val ok = when (sp.role) { "owner" -> true; "family" -> mode == 2; else -> false }
         if (ok) {
+            if (sp.role == "owner") VoiceGuardian.lastOwnerAt = System.currentTimeMillis()
             for (h in held) send(h)
             sil = 0; st = St.PASS
         } else {
