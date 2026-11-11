@@ -109,6 +109,7 @@ class GeminiLive(
         "Prefer ONE do_steps call with the whole sequence (open_app, tap, type, submit, scroll_down, wait...). " +
         "To play a song or video on YouTube ALWAYS call play_youtube(query) - it searches and plays by itself. Say it is playing ONLY if the result starts with 'done'; if it says failed, call read_screen and fix it (tap the video / play button) before telling him, never claim it is playing otherwise. If a step fails or you are unsure what is on screen, call read_screen, then continue. Speak only once at the end, in a few words. " +
         "STOP: if the user tells you to go off / stop / sleep / be quiet (off ho jao, band ho jao, so jao, bas, chup, bye) call end_session at once and say only a 2-3 word goodbye. " +
+        "OUTFIT: if he asks you to change your cloth, outfit, dress or look, NEVER say you are an AI or cannot wear clothes. Call change_outfit and say in one short line that the outfit picker is open so he can choose a look. " +
         "WHATSAPP: to send a WhatsApp message call whatsapp_message(person, message) - never do it with do_steps. Use the contact name as the user said it (ammi, papa, etc). If it fails with contact not found, ask him for the exact contact name. " +
         "INSTAGRAM: to message someone on Instagram call instagram_message(person, message) with the exact name and the exact words the user dictated (fix only obvious speech-to-text slips). If he did not say what to write, ask once. " +
         "NOTIFICATIONS: when he asks about notifications/messages/'kya aaya', call read_notifications and summarise briefly (who, which app, gist). Read OTPs/codes only if he asks for them. " +
@@ -154,6 +155,7 @@ class GeminiLive(
      {"name":"promote_channel","description":"Write a short promo message for the user's channel and open the share sheet so HE picks WhatsApp status/groups/friends. Pass link if the user tells his channel/profile link.","parameters":{"type":"OBJECT","properties":{"link":{"type":"STRING"}}}},
      {"name":"growth_status","description":"Show progress towards the growth goal. Reads the real count from the app automatically; pass current_count only if the user states it or auto-read failed.","parameters":{"type":"OBJECT","properties":{"current_count":{"type":"INTEGER"}}}},
      {"name":"cancel_install","description":"Cancel/stop an app install or download that was started from the Play Store. Call when the user says install cancel, download band karo, rok do.","parameters":{"type":"OBJECT","properties":{}}},
+     {"name":"change_outfit","description":"Open the outfit picker so the user can change your cloth, outfit, dress or look. Call this when the user asks to change your clothes/outfit/look (kapde badlo, cloth change karo, outfit badlo).","parameters":{"type":"OBJECT","properties":{}}},
      {"name":"end_session","description":"Stop listening and go back to sleep (wake-word standby). Call this when the user says things like: Divya off ho jao, band ho jao, so jao, bas, chup ho jao, mic band karo, stop, bye, go to sleep.","parameters":{"type":"OBJECT","properties":{}}},
      {"name":"whatsapp_message","description":"Send a WhatsApp message to a contact by name (or phone number). Looks up the contact, opens the chat and presses send. ALWAYS use this for WhatsApp messages instead of do_steps.","parameters":{"type":"OBJECT","properties":{"person":{"type":"STRING"},"message":{"type":"STRING"}},"required":["person","message"]}},
      {"name":"instagram_message","description":"Send an Instagram DM: opens Instagram, finds the person by name, types the message and presses send.","parameters":{"type":"OBJECT","properties":{"person":{"type":"STRING"},"message":{"type":"STRING"}},"required":["person","message"]}},
@@ -388,6 +390,7 @@ class GeminiLive(
                         "__dup" -> "already done a moment ago - DO NOT call this again. Just tell the user in a few words that it is done."
                         "__voice" -> gate ?: "blocked"
                         "__locked" -> "phone locked hai - user se kaho pehle phone unlock kare"
+                        "change_outfit" -> { main.post { OutfitBus.open = true }; "ok. Outfit picker khul gaya hai. Sirf ek chhota jawab do, jaise: Ji Sir, wahan se apni pasand ki image chuniye." }
                         "whatsapp_message" -> svc?.whatsappMessage(a.optString("person"), a.optString("message")) ?: "accessibility off"
                         "instagram_message" -> svc?.instagramDm(a.optString("person"), a.optString("message")) ?: "accessibility off"
                         "schedule_task" -> Scheduler.add(ctx, a.optString("kind", "call_and_say"), a.optString("person"), a.optString("message"),

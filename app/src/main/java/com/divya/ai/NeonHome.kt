@@ -90,10 +90,7 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
     }
     val blue = Color(0xFF6FC3FF)
     val edge = Brush.horizontalGradient(listOf(th.accent, th.accent.copy(alpha = 0.55f)))
-    var outfitOpen by remember { mutableStateOf(false) }
-    var outfitTick by remember { mutableStateOf(0) }
-    val custom = remember(outfitTick) { Outfits.loadSelected(ctx) }
-    if (outfitOpen) OutfitDialog(th.accent, onChanged = { outfitTick++ }, onDismiss = { outfitOpen = false })
+    val custom = remember(OutfitBus.version) { Outfits.loadSelected(ctx) }
     val tiles = listOf(
         NeonTileData(Icons.Filled.Chat, "Chat with AI", "Ask Anything…", blue, false) { go(Screen.Chat) },
         NeonTileData(Icons.Filled.QrCodeScanner, "Scanner", "Scan QR / Docs", blue, true) { go(Screen.Scan) },
@@ -104,7 +101,7 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
         NeonTileData(Icons.Filled.Star, "Video Gen AI", "Topic → Video in seconds", Color(0xFFFFC107), true) { go(Screen.VideoStudio) },
         NeonTileData(Icons.Filled.CleaningServices, "Files Cleaner", "Clean Junk Files…", blue, false) { cleaner() },
         NeonTileData(Icons.Filled.FlashOn, "Quick Actions", "Shortcuts for you…", Color(0xFFFFC107), false) { go(Screen.Quick) },
-        NeonTileData(Icons.Filled.Checkroom, "Outfit", "Divya ka look badlo", blue, false) { outfitOpen = true }
+        NeonTileData(Icons.Filled.Checkroom, "Outfit", "Divya ka look badlo", blue, false) { OutfitBus.open = true }
     )
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 48.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {

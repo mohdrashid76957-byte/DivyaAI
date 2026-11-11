@@ -272,6 +272,11 @@ fun DivyaApp(ctx: Context) {
         // "image bana do" jaisi baat Pro Chat mein jaati hai (wahi image banakar dikhati hai)
         if (ImageGen.isRequest(t)) { ProBus.pending = t; screen = Screen.ProChat; return }
         msgs.add("You" to t)
+        if (OutfitBus.isRequest(t)) {
+            msgs.add("Divya" to "Ji Sir, outfit chunne ki screen khol di hai. Wahan se apni pasand ki image chuniye.")
+            OutfitBus.open = true
+            return
+        }
         val offlineNow = !Net.online(ctx) || prefs.getBoolean("offlineOnly", false)
         if (live.running) live.sendText(t)
         else if (!offlineNow && LlmRouter.ready(prefs)) {
@@ -296,6 +301,7 @@ fun DivyaApp(ctx: Context) {
         } else WakeBus.liveActive = live.running
     }
 
+    if (OutfitBus.open) OutfitDialog(androidx.compose.ui.graphics.Color(0xFF6FC3FF), onChanged = { OutfitBus.version++ }, onDismiss = { OutfitBus.open = false })
     BackHandler(screen != Screen.Home) { screen = Screen.Home }
     // Home par Back dabane par agar Divya chal rahi hai to app band mat karo, background mein bhej do (session + glow chalte rahein)
     BackHandler(screen == Screen.Home) {
