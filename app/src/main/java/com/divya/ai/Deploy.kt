@@ -115,6 +115,7 @@ object Deploy {
                     info = "HTTP ${r.code}"
                     if (isPrivateWall(r.request.url.toString(), body)) { privHits++; info = "PRIVATE (Netlify login wall)"; if (privHits >= 3) return Triple(false, info, true) }
                     else if (r.isSuccessful && body.contains("<html", true) && !body.contains("Site not found", true)) return Triple(true, info, false)
+                    Unit
                 }
             } catch (e: Exception) { info = e.javaClass.simpleName + ": " + (e.message ?: "").take(60) }
             try { Thread.sleep(1500) } catch (_: InterruptedException) { break }
@@ -189,7 +190,8 @@ object Deploy {
     }
 
     /** Project ko GitHub repo mein daal kar Pages on karta hai. Fail ho to null (caller purana message deta hai). */
-    private fun githubPages(c: Context, token: String, project: String): String? = try {
+    private fun githubPages(c: Context, token: String, project: String): String? {
+    return try {
         val p = CodeStore.resolve(c, project) ?: return null
         val base = File(CodeStore.root(c), CodeStore.safeName(p))
         val (uc, ub) = ghCall(token, "GET", "https://api.github.com/user", null)
@@ -234,6 +236,7 @@ object Deploy {
         if (ok) "$link LIVE hai (GitHub Pages, public, check kar li: $info). Netlify private tha isliye GitHub par daala. Link copy ho gaya, Chrome/notification se khulega. Ye exact link user ko batao."
         else "$link GitHub Pages par daal diya par abhi build ho raha hai ($info). 1-2 minute mein khulega. Link copy ho gaya. User ko yahi batao, LIVE mat bolo jab tak khule nahi."
     } catch (e: Exception) { Log.w(TAG, "github", e); null }
+    }
 
     // ---- Alag hosts ki chain: GitHub Pages -> Neocities (dono hamesha public). Koi nahi chala to null ----
     private fun altHosts(c: Context, project: String): String? {
@@ -244,7 +247,8 @@ object Deploy {
     }
 
     /** Neocities: free, ek API key, turant public. Site https://<sitename>.neocities.org/<project>/ par aati hai. */
-    private fun neocities(c: Context, key: String, project: String): String? = try {
+    private fun neocities(c: Context, key: String, project: String): String? {
+    return try {
         val p = CodeStore.resolve(c, project) ?: return null
         val base = File(CodeStore.root(c), CodeStore.safeName(p))
         val dir = CodeStore.safeName(p).lowercase().replace(Regex("[^a-z0-9_-]"), "-")
@@ -277,4 +281,5 @@ object Deploy {
         if (ok) "$link LIVE hai (Neocities, public, check kar li: $inf). Link copy ho gaya, Chrome/notification se khulega. Ye exact link user ko batao."
         else "$link Neocities par daal diya par abhi khul nahi raha ($inf). Link copy ho gaya, thodi der mein khulega. LIVE mat bolo jab tak khule nahi."
     } catch (e: Exception) { Log.w(TAG, "neocities", e); null }
+    }
 }
