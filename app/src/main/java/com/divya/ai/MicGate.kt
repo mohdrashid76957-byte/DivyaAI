@@ -31,6 +31,8 @@ class MicGate(private val ctx: Context) {
     private var sil = 0
     private var floor = 120.0
     private var lastNotify = 0L
+    private val RECHECK = 16                // PASS ke dauran har 16 bolne wale chunk (~0.8s) par awaaz dobara check
+    private val recheck = ArrayList<ShortArray>()
 
     private fun rms(a: ShortArray): Double { var s = 0.0; for (v in a) s += v.toDouble() * v; return sqrt(s / a.size) }
     private fun bytes(a: ShortArray): ByteArray {
@@ -75,8 +77,15 @@ class MicGate(private val ctx: Context) {
                 if (voiced >= DECIDE_VOICED || held.size >= MAX_HOLD + PRE || ended) decide(out) { send(it) }
             }
             St.PASS -> {
-                send(chunk)
-                if (speech) sil = 0 else { sil++; if (sil >= END_SIL) { st = St.IDLE; pre.clear() } }
+                // Owner ke bolna shuru karne ke baad koi dusra bole (ya beech mein bol pade) to use bhi na jane do
+                if (speech) { sil = 0; recheck.add(chunk) } else sil++
+                if (recheck.size >= RECHECK && !stillAllowed()) {
+                    recheck.clear(); sil = 0; st = St.DROP; silence()
+                } else {
+                    if (recheck.size >= RECHECK) recheck.clear()
+                    send(chunk)
+                    if (!speech && sil >= END_SIL) { st = St.IDLE; pre.clear(); recheck.clear() }
+                }
             }
             St.DROP -> {
                 silence()
@@ -84,6 +93,27 @@ class MicGate(private val ctx: Context) {
             }
         }
         return out
+    }
+
+    private fun stillAllowed(): Boolean {
+        val total = recheck.sumOf { it.size }
+        val pcm = ShortArray(total); var o = 0
+        for (h in recheck) { System.arraycopy(h, 0, pcm, o, h.size); o += h.size }
+        val p = ctx.getSharedPreferences("divya", 0)
+        val sp = VoiceGuardian.identifyRaw(p, pcm)
+        if (sp.role == "unverified") return true
+        VoiceGuardian.last = sp
+        val mode = p.getInt("vgMode", 1)
+        return when (sp.role) {
+            "owner" -> true
+            "family" -> mode == 2
+            else -> {
+                // thoda hysteresis: owner ki khansi/shor se ek baar score thoda upar jaye to na kato; saaf alag awaaz par kato
+                val bad = sp.limit > 0 && sp.score / sp.limit > 1.15
+                if (bad) VoiceGuardian.blockedHeard(ctx, sp)
+                !bad
+            }
+        }
     }
 
     private fun decide(out: ArrayList<ByteArray>, send: (ShortArray) -> Unit) {
@@ -109,5 +139,5 @@ class MicGate(private val ctx: Context) {
         held.clear()
     }
 
-    fun reset() { st = St.IDLE; pre.clear(); held.clear(); voiced = 0; sil = 0 }
+    fun reset() { st = St.IDLE; pre.clear(); held.clear(); recheck.clear(); voiced = 0; sil = 0 }
 }

@@ -580,6 +580,8 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     var voice by remember { mutableStateOf(prefs.getString("voice", "Aoede")!!) }
     var callName by remember { mutableStateOf(prefs.getString("call", "Sir")!!) }
     var nlToken by remember { mutableStateOf(prefs.getString("netlifyToken", "") ?: "") }
+    var ghToken by remember { mutableStateOf(prefs.getString("ghToken", "") ?: "") }
+    var neoToken by remember { mutableStateOf(prefs.getString("neoToken", "") ?: "") }
     val homeOrig = remember { prefs.getString("homeAddr", "") ?: "" }
     var homeAddr by remember { mutableStateOf(homeOrig) }
     var saved by remember { mutableStateOf(false) }
@@ -596,7 +598,13 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     Text("app.netlify.com par free account > User settings > Applications > Personal access token banao aur yahan daalo. Phir bolo: \"Divya, mere liye portfolio website banao aur live karo\".", color = th.text, fontSize = 12.sp)
     OutlinedTextField(nlToken, { nlToken = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Netlify token") },
         visualTransformation = PasswordVisualTransformation(), singleLine = true, colors = colors)
-    Btn(th, "Save") { prefs.edit().putString("netlifyToken", nlToken.trim()).putString("key", key.trim()).putString("model", model.trim()).putString("voice", voice.trim()).putString("call", callName.trim().ifBlank { "Sir" })
+    Text("Netlify 'This site is private' dikhaye to: github.com > Settings > Developer settings > Personal access tokens (classic) > 'repo' tick karke token banao aur yahan daalo. Tab Divya site GitHub Pages par public daal degi.", color = th.text, fontSize = 12.sp)
+    OutlinedTextField(ghToken, { ghToken = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("GitHub token (backup publish)") },
+        visualTransformation = PasswordVisualTransformation(), singleLine = true, colors = colors)
+    Text("Sabse aasan (bina Netlify): neocities.org par free account banao > Settings > Manage Site Settings > API Key. Yahan daalo, site hamesha public khulegi.", color = th.text, fontSize = 12.sp)
+    OutlinedTextField(neoToken, { neoToken = it; saved = false }, Modifier.fillMaxWidth(), label = { Text("Neocities API key") },
+        visualTransformation = PasswordVisualTransformation(), singleLine = true, colors = colors)
+    Btn(th, "Save") { prefs.edit().putString("neoToken", neoToken.trim()).putString("ghToken", ghToken.trim()).putString("netlifyToken", nlToken.trim()).putString("key", key.trim()).putString("model", model.trim()).putString("voice", voice.trim()).putString("call", callName.trim().ifBlank { "Sir" })
         .also { e -> e.putString("homeAddr", homeAddr.trim()); if (homeAddr.trim() != homeOrig) { e.remove("homeLat"); e.remove("homeLng") } }.apply(); saved = true }
     if (saved) Text("✅ Saved", color = th.accent)
     Btn(th, "Backup & restore (yaadein, chats)") { openBackup() }

@@ -673,7 +673,7 @@ class GeminiLive(
                             if (sfill == sbuf.size) {
                                 sfill = 0
                                 try { for (b in gate.feed(sbuf.copyOf()) { ringPut(it, it.size) }) sendAudio(b, b.size) }
-                                catch (e: Throwable) { android.util.Log.e("DivyaGate", "gate error", e); gateOn = false; gate.reset() }
+                                catch (e: Throwable) { android.util.Log.e("DivyaGate", "gate error", e); gate.reset() }   // fail-closed: gate error par bhi sab kuch Gemini tak nahi jayega
                             }
                         }
                     }
