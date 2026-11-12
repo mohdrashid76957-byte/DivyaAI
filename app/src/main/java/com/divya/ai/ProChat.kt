@@ -108,7 +108,7 @@ object ProState {
     private fun systemPrompt(c: Context): String {
         val p = c.getSharedPreferences("divya", 0)
         val custom = p.getString("proCustom", "") ?: ""
-        return ProEngine.SYSTEM + " The user's name for you to call them: ${p.getString("call", "Sir")}. Today's date: ${java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.US).format(java.util.Date())}." +
+        return ProEngine.SYSTEM + Memory.brief(c) + " The user's name for you to call them: ${p.getString("call", "Sir")}. Today's date: ${java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.US).format(java.util.Date())}." +
             (if (custom.isNotBlank()) " USER'S CUSTOM INSTRUCTIONS: $custom" else "")
     }
 
@@ -157,6 +157,12 @@ object ProState {
         val u = PMsg("user", text.trim(), atts)
         atts.firstOrNull { it.zipFile != null }?.let { at -> val it = at.zipFile!!; baseZip = it; c.getSharedPreferences("divya", 0).edit().putString("proBaseZip", it.absolutePath).putString("proBaseName", at.name).apply() }
         msgs.add(u)
+        // v2.40: yaadein aur habits - sirf message ki shuruaat wale saaf commands (general chat ko na roke)
+        val personalCmd = Regex("(?i)^(divya[,\\s]+)?(yaad rakh|remember that|bhool jao|bhul jao|mujhe kya yaad hai|habits?\\s|\\S+\\s+(piya|pi li|pi liya|kar li|kar liya|khaya|done)\\s*[.!]?$)")
+        if (atts.isEmpty() && personalCmd.containsMatchIn(text.trim())) {
+            val reply = try { Memory.handle(c, text.trim()) ?: Habits.handle(c, text.trim()) } catch (_: Exception) { null }
+            if (reply != null) { msgs.add(PMsg("model", reply)); return }
+        }
         if (atts.isEmpty() && ImageGen.isRequest(text)) { genImage(c, text); return }
         go(c, text.trim().startsWith("/project") || projectMode, text.trim().removePrefix("/project").trim())
         projectMode = false

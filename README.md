@@ -458,3 +458,31 @@ Naya file `OfflineFeatures.kt`, `OfflineBrain` sabse pehle isse poochta hai. Koi
 - Lambai 15/30/45/60 sec (~5 sec per scene, max 12 scenes). AI images 10-40 sec lagti hain, isliye preview thodi der baad shuru hoti hai. Jaldi ke liye "⚡ Neon (fast)".
 - Voice se: Divya ab script nahi likhti, bas poora idea `make_video(topic)` ko deti hai.
 - Limit: ye images + motion hai, asli AI-video (har frame generate) nahi; character consistency same prompt + same seed se aati hai, perfect nahi.
+
+## v2.40.1 - Divya ki Yaadein + Habit Tracker (naye advanced features)
+Dono features sirf ONLINE mode mein chalte hain: Gemini Live (voice) aur Pro Chat (typed). Offline mode mein ye nahi chalte. Ye phone par hi save hote hain (koi naya network ya dependency nahi).
+
+**1. Divya ki Yaadein (long-term personal memory)**
+- Bolo: "Divya, yaad rakho mera birthday 5 March hai" -> save hota hai (`remember_fact`).
+- Baad mein: "mera birthday kab hai?" / "mujhe kya yaad hai" -> yaad se jawab (`recall_memory`). "ghar ka pata bhool jao" -> hata deta hai (`forget_memory`).
+- Har naye session aur Pro Chat ke shuru mein sabse nayi yaadein Divya ko di jaati hain, taaki wo tum ko jaane. Max 300 yaadein, ~1500 characters prompt mein.
+- Password, PIN, OTP, card aur bank details kabhi save nahi hote (safety check + prompt rule).
+- Ye file sirf is phone mein hai: `files/divya_memory.json`. Backup mein abhi nahi jaati.
+- Naya session shuru hone par hi nayi yaad prompt mein aati hai. Session ke beech save hui baat turant jawab mein dikhti hai, sirf prompt mein agle session se.
+
+**2. Habit & Wellness Tracker**
+- "Habit add paani 8" ya voice: "paani ki habit roz 8 baar" -> roz ka goal (`habit_add`).
+- "Aaj 3 glass paani piye" / "paani piya" -> progress count (`habit_log`).
+- "Habit status" / "meri habits batao" -> aaj ka progress + streak (lagataar din goal poora hua) (`habit_status`).
+- "Habit hatao paani" -> habit delete (`habit_delete`).
+- Ye sirf ginti aur streak rakhta hai, medical salah nahi deta. Dawai ke time par reminder abhi nahi hai (agla step).
+
+**Code:** naye files `Memory.kt`, `Habits.kt`. Badle: `GeminiLive.kt` (7 tools + prompt rules + session memory), `OfflineFeatures.kt` (offline commands), `ProChat.kt` (memory block + saaf commands).
+- Version 2.40.1 (versionCode 67). Offline mode mein koi change nahi.
+- **Ye code is session mein compile/test nahi hua (Android SDK nahi tha).** Build error aaye to error ki line bhej do.
+
+**Agle advanced steps (roadmap, abhi nahi bane):**
+- Habit ke liye roz ka repeating reminder (abhi Scheduler sirf ek baar ka hai).
+- Memory ko Backup & restore mein jodna aur Settings se list dekhna / edit karna.
+- Offline hotword (Vosk / Porcupine) taaki wake word mein mic indicator kabhi na dikhe.
+- Chhota on-device LLM (1 GB se kam) taaki offline mein bhi natural baat ho.
