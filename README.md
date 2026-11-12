@@ -486,3 +486,9 @@ Dono features sirf ONLINE mode mein chalte hain: Gemini Live (voice) aur Pro Cha
 - Memory ko Backup & restore mein jodna aur Settings se list dekhna / edit karna.
 - Offline hotword (Vosk / Porcupine) taaki wake word mein mic indicator kabhi na dikhe.
 - Chhota on-device LLM (1 GB se kam) taaki offline mein bhi natural baat ho.
+
+## v3.1 - Version fix
+- About screen ab sahi version (3.1) aur build number (68) dikhata hai. Pehle purana 2.40.1 dikhta tha kyunki versionName build.gradle se nahi badla tha.
+- Crash log ka version constant bhi 3.1 kar diya.
+- About ka "Latest Update" card ab current changes (yaadein, habit tracker) dikhata hai.
+- Install ke liye: purana APK ke upar install karo (versionCode 68 > 67, to update ho jayega).
