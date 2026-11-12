@@ -101,7 +101,7 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
         NeonTileData(Icons.Filled.Star, "Video Gen AI", "Topic → Video in seconds", Color(0xFFFFC107), true) { go(Screen.VideoStudio) },
         NeonTileData(Icons.Filled.CleaningServices, "Files Cleaner", "Clean Junk Files…", blue, false) { cleaner() },
         NeonTileData(Icons.Filled.FlashOn, "Quick Actions", "Shortcuts for you…", Color(0xFFFFC107), false) { go(Screen.Quick) },
-        NeonTileData(Icons.Filled.Checkroom, "Outfit", "Divya ka look badlo", blue, false) { OutfitBus.show() }
+        NeonTileData(Icons.Filled.Checkroom, "Outfit", "Divya ka look badlo", blue, false) { OutfitBus.open = true }
     )
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 48.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
