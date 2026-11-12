@@ -390,7 +390,7 @@ class GeminiLive(
                         "__dup" -> "already done a moment ago - DO NOT call this again. Just tell the user in a few words that it is done."
                         "__voice" -> gate ?: "blocked"
                         "__locked" -> "phone locked hai - user se kaho pehle phone unlock kare"
-                        "change_outfit" -> { main.post { OutfitBus.show() }; "ok. Outfit picker khul gaya hai. Sirf ek chhota jawab do, jaise: Ji Sir, wahan se apni pasand ki image chuniye." }
+                        "change_outfit" -> { main.post { OutfitBus.open = true }; "ok. Outfit picker khul gaya hai. Sirf ek chhota jawab do, jaise: Ji Sir, wahan se apni pasand ki image chuniye." }
                         "whatsapp_message" -> svc?.whatsappMessage(a.optString("person"), a.optString("message")) ?: "accessibility off"
                         "instagram_message" -> svc?.instagramDm(a.optString("person"), a.optString("message")) ?: "accessibility off"
                         "schedule_task" -> Scheduler.add(ctx, a.optString("kind", "call_and_say"), a.optString("person"), a.optString("message"),
