@@ -101,7 +101,7 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
         NeonTileData(Icons.Filled.Star, "Video Gen AI", "Topic → Video in seconds", Color(0xFFFFC107), true) { go(Screen.VideoStudio) },
         NeonTileData(Icons.Filled.CleaningServices, "Files Cleaner", "Clean Junk Files…", blue, false) { cleaner() },
         NeonTileData(Icons.Filled.FlashOn, "Quick Actions", "Shortcuts for you…", Color(0xFFFFC107), false) { go(Screen.Quick) },
-        NeonTileData(Icons.Filled.Checkroom, "Outfit", "Divya ka look badlo", blue, false) { OutfitBus.open = true }
+        NeonTileData(Icons.Filled.Checkroom, "Outfit", "Divya ka look badlo", blue, false) { OutfitBus.show() }
     )
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 48.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -118,7 +118,7 @@ fun NeonHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic
                 "Anime Neon" -> intArrayOf(R.drawable.divya_av_anime_listen, R.drawable.divya_av_anime_think, R.drawable.divya_av_anime_happy)
                 else -> null
             }
-            AvatarHero(th.img, faces, th.accent, Modifier.weight(1.05f).fillMaxHeight().clickable { onAvatar() }, custom)
+            AvatarHero(remember(OutfitBus.version) { Outfits.selectedRes(ctx) } ?: th.img, faces, th.accent, Modifier.weight(1.05f).fillMaxHeight().clickable { onAvatar() }, custom)
             Column(Modifier.weight(0.95f).padding(start = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 val hello = buildAnnotatedString {
                     append("Hello $callName! 👋\nI am ")

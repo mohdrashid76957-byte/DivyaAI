@@ -274,7 +274,7 @@ fun DivyaApp(ctx: Context) {
         msgs.add("You" to t)
         if (OutfitBus.isRequest(t)) {
             msgs.add("Divya" to "Ji Sir, outfit chunne ki screen khol di hai. Wahan se apni pasand ki image chuniye.")
-            OutfitBus.open = true
+            OutfitBus.show()
             return
         }
         val offlineNow = !Net.online(ctx) || prefs.getBoolean("offlineOnly", false)
@@ -301,7 +301,9 @@ fun DivyaApp(ctx: Context) {
         } else WakeBus.liveActive = live.running
     }
 
-    if (OutfitBus.open) OutfitDialog(androidx.compose.ui.graphics.Color(0xFF6FC3FF), onChanged = { OutfitBus.version++ }, onDismiss = { OutfitBus.open = false })
+    if (OutfitBus.open) androidx.compose.runtime.key(OutfitBus.requests) {
+        OutfitDialog(androidx.compose.ui.graphics.Color(0xFF6FC3FF), onChanged = { OutfitBus.version++ }, onDismiss = { OutfitBus.open = false })
+    }
     BackHandler(screen != Screen.Home) { screen = Screen.Home }
     // Home par Back dabane par agar Divya chal rahi hai to app band mat karo, background mein bhej do (session + glow chalte rahein)
     BackHandler(screen == Screen.Home) {
