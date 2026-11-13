@@ -63,7 +63,7 @@ enum class Screen { Home, Chat, Apps, Quick, Automate, Phone, Settings, Perms, J
 
 class UiTheme(
     val name: String, val img: Int, val circle: Boolean, val bg: Brush, val text: Color, val accent: Color,
-    val greet: String, val menu: List<Triple<String, Screen, ImageVector>>, val hud: Boolean = false, val maya: Boolean = false, val neon: Boolean = false, val ice: Boolean = false, val cyber: Boolean = false, val wall: Int? = null
+    val greet: String, val menu: List<Triple<String, Screen, ImageVector>>, val hud: Boolean = false, val maya: Boolean = false, val neon: Boolean = false, val ice: Boolean = false, val cyber: Boolean = false, val stonic: Boolean = false, val wall: Int? = null
 )
 
 val themes = listOf(
@@ -145,7 +145,11 @@ val themes = listOf(
     // Kali Linux: kala + electric neela neon, dragon/hacker-girl wallpaper (Divya Kali theme)
     UiTheme("Kali Linux", R.drawable.divya_av_blue, false,
         Brush.verticalGradient(listOf(Color(0xFF000208), Color(0xFF020B2D), Color(0xFF000208))), Color.White, Color(0xFF2F8BFF),
-        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), neon = true, wall = R.drawable.divya_kali_wall)
+        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), neon = true, wall = R.drawable.divya_kali_wall),
+    // Stonic HUD (v3.2): reference video jaisa sci-fi HUD - glowing character frame + Memory/Skills/Character/Settings nodes + TERMINATE
+    UiTheme("Stonic HUD", R.drawable.divya_hero, false,
+        Brush.verticalGradient(listOf(Color(0xFF030A14), Color(0xFF061A2B), Color(0xFF030A14))), Color.White, Color(0xFF19F5D4),
+        "", listOf(Triple("Home", Screen.Home, Icons.Filled.Home)), stonic = true)
 )
 
 class MainActivity : ComponentActivity() {
@@ -342,7 +346,8 @@ fun DivyaApp(ctx: Context) {
                 },
                 label = "screen"
             ) { s -> when (s) {
-                Screen.Home -> if (th.cyber) CyberHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
+                Screen.Home -> if (th.stonic) StonicHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
+                    else if (th.cyber) CyberHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
                     else if (th.ice) IceHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
                     else if (th.neon) NeonHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic, {
                     // Avatar par tap: agla avatar design (Neon, 3D, Anime, Blue, Gold, Pink)
@@ -376,7 +381,8 @@ fun DivyaApp(ctx: Context) {
                 Screen.Backup -> BackupScreen(th, ctx)
             } }
         }
-        if (th.ice) NeonNav(screen, micNow, tapMic, th.accent, true) { screen = it }
+        if (th.stonic) { if (screen != Screen.Home) NeonNav(screen, micNow, tapMic, th.accent, true) { screen = it } }
+        else if (th.ice) NeonNav(screen, micNow, tapMic, th.accent, true) { screen = it }
         else if (th.neon) NeonNav(screen, micNow, tapMic) { screen = it }
         else if (th.maya) MayaNav(th, screen, micNow, tapMic) { screen = it }
         else Row(Modifier.fillMaxWidth().padding(10.dp).clip(RoundedCornerShape(22.dp))

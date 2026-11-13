@@ -199,11 +199,14 @@ fun AboutScreen(th: UiTheme) {
             .border(1.dp, th.accent.copy(alpha = 0.6f), RoundedCornerShape(16.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("🆕 Latest Update — v$ver", color = th.accent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             listOf(
-                "🧠 Divya ki Yaadein: \"yaad rakho ...\" bolo, Divya phone par yaad rakhegi (online mode)",
-                "🧠 \"mujhe kya yaad hai\" / \"bhool jao ...\" se yaadein dekho ya hatao",
-                "💧 Habit tracker: \"habit add paani 8\", \"paani piya\", \"habit status\" (streak ke saath)",
-                "🔒 Yaadein aur habits sirf online mode (Gemini Live + Pro Chat) mein chalte hain",
-                "🔄 About ab sahi version (3.1) aur build number dikhata hai"
+                "🏠 Divya Kali Home: ab phone ka asli Home launcher ban sakta hai (Kali wallpaper + neon hex icons + dock)",
+                "🏠 Kali Launcher screen > \"Phone Home banao\" dabao, dialog mein Divya AI (Kali Home) chuno",
+                "🐉 Home par naya \"Kali Launcher\" tile + Tools mein button: yahin se Kali theme/wallpaper on karo",
+                "🐉 Kali Linux theme + Divya Kali wallpaper",
+                "🚀 Divya Kali Launcher: neon hex icons, categories, search",
+                "🖼 Apps screen se ek tap mein Kali wallpaper (home + lock)",
+                "🔄 About mein ab sahi version aur latest update dikhta hai",
+                "🎙 Wake word loop aur voice orb fixes (v2.22.7 - v2.22.10)"
             ).forEach { Text(it, color = th.text, fontSize = 13.sp) }
         }
         Btn(th, "🔄 Check for update") {

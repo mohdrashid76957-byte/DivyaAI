@@ -487,8 +487,10 @@ Dono features sirf ONLINE mode mein chalte hain: Gemini Live (voice) aur Pro Cha
 - Offline hotword (Vosk / Porcupine) taaki wake word mein mic indicator kabhi na dikhe.
 - Chhota on-device LLM (1 GB se kam) taaki offline mein bhi natural baat ho.
 
-## v3.1 - Version fix
-- About screen ab sahi version (3.1) aur build number (68) dikhata hai. Pehle purana 2.40.1 dikhta tha kyunki versionName build.gradle se nahi badla tha.
-- Crash log ka version constant bhi 3.1 kar diya.
-- About ka "Latest Update" card ab current changes (yaadein, habit tracker) dikhata hai.
-- Install ke liye: purana APK ke upar install karo (versionCode 68 > 67, to update ho jayega).
+## v3.2 - Stonic HUD (sci-fi "future" feel)
+- Naya theme **Stonic HUD** (Settings > UI Design se chuno; nayi install par default): dark navy + grid, beech-dayen glowing Divya frame (corner brackets, scanline, awaaz ke saath pulse).
+- Baayen taraf 4 nodes **MEMORY / SKILLS / CHARACTER / SETTINGS** rang-birangi lines se frame se jude, lines par chalte light dots. Tap: Memory=Journal, Skills=Quick Actions, Character=Apps/themes, Settings.
+- Lal **TERMINATE** pill = Divya band; band hone par **ACTIVATE** (mic on).
+- Neeche **LIVE FEED** panel: jo suna/bola ja raha hai, waveform, VOICE / AI LINK / NET chips.
+- Naya file `StonicHome.kt`. Badle: `MainActivity.kt` (theme + home + nav), `build.gradle.kts` (3.2 / code 68).
+- **Compile/test nahi hua** (SDK nahi tha). Build error aaye to error ki line bhej do.
