@@ -510,3 +510,6 @@ Dono features sirf ONLINE mode mein chalte hain: Gemini Live (voice) aur Pro Cha
 
 ## v3.3.1
 - Build fix: StonicHome.kt mein `quadTo` -> `quadraticBezierTo` aur `clipPath` import (compile error).
+
+## v3.3.2
+- Privacy password badla (License.kt HASH). Naya password sirf hash ke roop mein code mein hai, plain text nahi.
