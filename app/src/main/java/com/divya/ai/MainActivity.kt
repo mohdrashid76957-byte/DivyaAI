@@ -228,6 +228,7 @@ fun DivyaApp(ctx: Context) {
     }
     // Ek baar: purani saved "glow OFF" value ko ON kar do (v2.0 se glow default ON hai)
     if (!prefs.getBoolean("glowV2", false)) prefs.edit().putBoolean("glow", true).putBoolean("glowV2", true).apply()
+    remember { Persona.load(ctx) }
     var themeIdx by remember { mutableStateOf(prefs.getInt("theme2", themes.lastIndex).coerceIn(0, themes.lastIndex)) }
     var screen by remember { mutableStateOf(Screen.Home) }
     var status by remember { mutableStateOf("Tap to Talk") }
@@ -346,7 +347,7 @@ fun DivyaApp(ctx: Context) {
                 },
                 label = "screen"
             ) { s -> when (s) {
-                Screen.Home -> if (th.stonic) StonicHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
+                Screen.Home -> if (th.stonic || Persona.on) StonicHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
                     else if (th.cyber) CyberHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
                     else if (th.ice) IceHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic) { screen = it }
                     else if (th.neon) NeonHome(th, status, micNow, prefs.getString("call", "Sir") ?: "Sir", tapMic, {
@@ -381,7 +382,7 @@ fun DivyaApp(ctx: Context) {
                 Screen.Backup -> BackupScreen(th, ctx)
             } }
         }
-        if (th.stonic) { if (screen != Screen.Home) NeonNav(screen, micNow, tapMic, th.accent, true) { screen = it } }
+        if (th.stonic || Persona.on) { if (screen != Screen.Home) NeonNav(screen, micNow, tapMic, th.accent, true) { screen = it } }
         else if (th.ice) NeonNav(screen, micNow, tapMic, th.accent, true) { screen = it }
         else if (th.neon) NeonNav(screen, micNow, tapMic) { screen = it }
         else if (th.maya) MayaNav(th, screen, micNow, tapMic) { screen = it }

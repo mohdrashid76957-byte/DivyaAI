@@ -51,6 +51,9 @@ private class StNode(val label: String, val icon: ImageVector, val color: Color,
 @Composable
 fun StonicHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic: () -> Unit, go: (Screen) -> Unit) {
     val ctx = LocalContext.current
+    val jarvis = Persona.on
+    val acc = if (jarvis) Color(0xFF3AB8FF) else StTeal
+    val who = if (jarvis) "Jarvis" else "Divya"
     val tr = rememberInfiniteTransition(label = "st")
     val flow by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing)), label = "flow")
     val breathe by tr.animateFloat(0.35f, 1f, infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "br")
@@ -73,20 +76,20 @@ fun StonicHome(th: UiTheme, status: String, live: Boolean, callName: String, onM
         AvatarBus.speaking -> "SPEAKING"
         else -> "LISTENING"
     }
-    val stateCol = if (live) StTeal else Color(0xFF5E7A99)
+    val stateCol = if (live) acc else Color(0xFF5E7A99)
 
     Column(Modifier.fillMaxSize().background(StBg)) {
         // ---- Header ----
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(38.dp).clip(CircleShape).background(StPanel).border(1.dp, StTeal.copy(alpha = 0.7f), CircleShape).clickable { go(Screen.Apps) },
-                contentAlignment = Alignment.Center) { Icon(Icons.Filled.Menu, "Menu", tint = StTeal, modifier = Modifier.size(20.dp)) }
+            Box(Modifier.size(38.dp).clip(CircleShape).background(StPanel).border(1.dp, acc.copy(alpha = 0.7f), CircleShape).clickable { go(Screen.Apps) },
+                contentAlignment = Alignment.Center) { Icon(Icons.Filled.Menu, "Menu", tint = acc, modifier = Modifier.size(20.dp)) }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("DIVYA // CORE", color = StTeal, fontSize = 20.sp, fontWeight = FontWeight.Black, fontFamily = StMono,
-                    style = TextStyle(shadow = androidx.compose.ui.graphics.Shadow(StTeal, blurRadius = 20f)))
-                Text("Welcome, $callName", color = Color(0xFF8FB8C9), fontSize = 11.sp, fontFamily = StMono)
+                Text(if (jarvis) "JARVIS // CORE" else "DIVYA // CORE", color = acc, fontSize = 20.sp, fontWeight = FontWeight.Black, fontFamily = StMono,
+                    style = TextStyle(shadow = androidx.compose.ui.graphics.Shadow(acc, blurRadius = 20f)))
+                Text(if (jarvis) "At your service, $callName" else "Welcome, $callName", color = Color(0xFF8FB8C9), fontSize = 11.sp, fontFamily = StMono)
             }
-            Box(Modifier.size(38.dp).clip(CircleShape).background(StPanel).border(1.dp, StTeal.copy(alpha = 0.7f), CircleShape).clickable { go(Screen.Settings) },
-                contentAlignment = Alignment.Center) { Icon(Icons.Filled.Settings, "Settings", tint = StTeal, modifier = Modifier.size(20.dp)) }
+            Box(Modifier.size(38.dp).clip(CircleShape).background(StPanel).border(1.dp, acc.copy(alpha = 0.7f), CircleShape).clickable { go(Screen.Settings) },
+                contentAlignment = Alignment.Center) { Icon(Icons.Filled.Settings, "Settings", tint = acc, modifier = Modifier.size(20.dp)) }
         }
 
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
@@ -104,14 +107,14 @@ fun StonicHome(th: UiTheme, status: String, live: Boolean, callName: String, onM
             Canvas(Modifier.fillMaxSize()) {
                 val step = 28.dp.toPx()
                 var gx = 0f
-                while (gx < size.width) { drawLine(StTeal.copy(alpha = 0.045f), Offset(gx, 0f), Offset(gx, size.height), 1f); gx += step }
+                while (gx < size.width) { drawLine(acc.copy(alpha = 0.045f), Offset(gx, 0f), Offset(gx, size.height), 1f); gx += step }
                 var gy = 0f
-                while (gy < size.height) { drawLine(StTeal.copy(alpha = 0.045f), Offset(0f, gy), Offset(size.width, gy), 1f); gy += step }
+                while (gy < size.height) { drawLine(acc.copy(alpha = 0.045f), Offset(0f, gy), Offset(size.width, gy), 1f); gy += step }
 
                 val fx = frameX.toPx(); val fy = frameY.toPx(); val fw = frameW.toPx(); val fh = frameH.toPx()
                 val c = Offset(fx + fw / 2, fy + fh / 2)
                 val glowA = (if (live) 0.18f + 0.30f * lvl else 0.10f) * (0.6f + 0.4f * breathe)
-                drawCircle(Brush.radialGradient(listOf(StTeal.copy(alpha = glowA), Color.Transparent), center = c, radius = fw * 1.1f), radius = fw * 1.1f, center = c)
+                drawCircle(Brush.radialGradient(listOf(acc.copy(alpha = glowA), Color.Transparent), center = c, radius = fw * 1.1f), radius = fw * 1.1f, center = c)
                 // frame ke bahar glow rings
                 for (k in 1..3) {
                     val g = k * 3.dp.toPx()
@@ -160,33 +163,34 @@ fun StonicHome(th: UiTheme, status: String, live: Boolean, callName: String, onM
             val fShape = RoundedCornerShape(18.dp)
             Box(Modifier.offset(frameX, frameY).size(frameW, frameH).clip(fShape).background(StPanel)
                 .border(1.6.dp, stateCol.copy(alpha = 0.6f + 0.4f * breathe), fShape).clickable { onMic() }) {
-                androidx.compose.foundation.Image(
+                if (jarvis) JarvisHolo(acc, lvl, live, scan, breathe)
+                else androidx.compose.foundation.Image(
                     painterResource(th.img), "Divya",
                     Modifier.fillMaxSize().graphicsLayer { val s = 1f + 0.035f * lvl; scaleX = s; scaleY = s; alpha = if (live) 1f else 0.82f },
                     contentScale = ContentScale.Crop, alignment = Alignment.TopCenter
                 )
                 Canvas(Modifier.fillMaxSize()) {
                     drawRect(Brush.verticalGradient(listOf(Color.Transparent, StBg.copy(alpha = 0.8f)), startY = size.height * 0.6f, endY = size.height))
-                    drawRect(StTeal.copy(alpha = 0.06f))
+                    drawRect(acc.copy(alpha = 0.06f))
                     // scanline
                     val sy = size.height * scan
-                    drawRect(Brush.verticalGradient(listOf(Color.Transparent, StTeal.copy(alpha = 0.28f), Color.Transparent), startY = sy - 40f, endY = sy + 40f),
+                    drawRect(Brush.verticalGradient(listOf(Color.Transparent, acc.copy(alpha = 0.28f), Color.Transparent), startY = sy - 40f, endY = sy + 40f),
                         topLeft = Offset(0f, sy - 40f), size = Size(size.width, 80f))
                     // corner brackets
                     val m = 7.dp.toPx(); val L = 20.dp.toPx(); val sw = 2.5.dp.toPx()
                     val w = size.width; val h = size.height
                     fun br(cx: Float, cy: Float, dx: Float, dy: Float) {
-                        drawLine(StTeal, Offset(cx, cy), Offset(cx + dx * L, cy), sw, StrokeCap.Round)
-                        drawLine(StTeal, Offset(cx, cy), Offset(cx, cy + dy * L), sw, StrokeCap.Round)
+                        drawLine(acc, Offset(cx, cy), Offset(cx + dx * L, cy), sw, StrokeCap.Round)
+                        drawLine(acc, Offset(cx, cy), Offset(cx, cy + dy * L), sw, StrokeCap.Round)
                     }
                     br(m, m, 1f, 1f); br(w - m, m, -1f, 1f); br(m, h - m, 1f, -1f); br(w - m, h - m, -1f, -1f)
                 }
-                Text("● Divya is ${stateText.lowercase()}", color = stateCol, fontSize = 10.sp, fontFamily = StMono, fontWeight = FontWeight.Bold,
+                Text("● $who is ${stateText.lowercase()}", color = stateCol, fontSize = 10.sp, fontFamily = StMono, fontWeight = FontWeight.Bold,
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
             }
 
             // ---- TERMINATE / ACTIVATE ----
-            val bCol = if (live) StRed else StTeal
+            val bCol = if (live) StRed else acc
             val bShape = RoundedCornerShape(50)
             Box(Modifier.offset(W * 0.25f, H * 0.515f).size(W * 0.5f, H * 0.062f).clip(bShape)
                 .background(bCol.copy(alpha = 0.10f + 0.10f * breathe)).border(1.6.dp, bCol, bShape).clickable { onMic() },
@@ -201,25 +205,66 @@ fun StonicHome(th: UiTheme, status: String, live: Boolean, callName: String, onM
             // ---- LIVE FEED panel ----
             val pShape = RoundedCornerShape(14.dp)
             Column(Modifier.offset(W * 0.03f, H * 0.605f).size(W * 0.94f, H * 0.375f).clip(pShape)
-                .background(StPanel.copy(alpha = 0.88f)).border(1.dp, StTeal.copy(alpha = 0.55f), pShape).padding(12.dp)) {
+                .background(StPanel.copy(alpha = 0.88f)).border(1.dp, acc.copy(alpha = 0.55f), pShape).padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("LIVE FEED", color = StTeal, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = StMono, letterSpacing = 2.sp)
+                    Text("LIVE FEED", color = acc, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = StMono, letterSpacing = 2.sp)
                     Spacer(Modifier.weight(1f))
                     Text(stateText, color = stateCol, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = StMono)
                 }
                 Spacer(Modifier.height(6.dp))
-                Text(if (cap.isNotBlank()) cap else status.ifBlank { "Divya ko jagane ke liye ACTIVATE dabao ya \"Wake up Divya\" bolo." },
+                Text(if (cap.isNotBlank()) cap else status.ifBlank { if (jarvis) "Jarvis online. ACTIVATE dabao ya bolo: Divya mode." else "Divya ko jagane ke liye ACTIVATE dabao ya \"Wake up Divya\" bolo." },
                     color = Color.White.copy(alpha = 0.88f), fontSize = 13.sp, fontFamily = StMono, maxLines = 4, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f))
-                WaveBars(StTeal, live, Modifier.fillMaxWidth().height(30.dp))
+                WaveBars(acc, live, Modifier.fillMaxWidth().height(30.dp))
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StChip("VOICE", "${(lvl * 100).toInt().coerceIn(0, 100)}%", StTeal, Modifier.weight(1f))
+                    StChip("VOICE", "${(lvl * 100).toInt().coerceIn(0, 100)}%", acc, Modifier.weight(1f))
                     StChip("AI LINK", if (live) "ON" else "OFF", if (live) Color(0xFF3DFFA2) else Color(0xFF5E7A99), Modifier.weight(1f))
                     StChip("NET", if (net) "ONLINE" else "OFFLINE", if (net) Color(0xFF19E3F0) else StRed, Modifier.weight(1f))
                 }
             }
         }
+    }
+}
+
+
+/** Jarvis hologram: cyan wireframe bust, scanline fill, glowing eyes, mooh awaaz ke saath khulta hai (video ke hologram character jaisa). */
+@Composable
+private fun JarvisHolo(c: Color, lvl: Float, live: Boolean, scan: Float, breathe: Float) {
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(Brush.verticalGradient(listOf(Color(0xFF021525), Color(0xFF031F38))))
+        val w = size.width; val h = size.height
+        val cx = w / 2; val hr = w * 0.21f; val hy = h * 0.34f
+        val head = Path().apply { addOval(androidx.compose.ui.geometry.Rect(Offset(cx, hy), hr)) }
+        val body = Path().apply {
+            moveTo(cx - hr * 2.3f, h); quadTo(cx - hr * 2.3f, hy + hr * 1.7f, cx - hr * 0.55f, hy + hr * 1.25f)
+            lineTo(cx + hr * 0.55f, hy + hr * 1.25f); quadTo(cx + hr * 2.3f, hy + hr * 1.7f, cx + hr * 2.3f, h); close()
+        }
+        val a = if (live) 1f else 0.6f
+        for (pth in listOf(head, body)) {
+            drawPath(pth, c.copy(alpha = 0.10f * a))
+            androidx.compose.ui.graphics.drawscope.clipPath(pth) {
+                var y = 0f
+                while (y < h) { drawLine(c.copy(alpha = 0.32f * a), Offset(0f, y), Offset(w, y), 1.dp.toPx()); y += 5.dp.toPx() }
+                var x = cx - hr * 2.4f
+                while (x < cx + hr * 2.4f) { drawLine(c.copy(alpha = 0.12f * a), Offset(x, 0f), Offset(x, h), 1f); x += 9.dp.toPx() }
+            }
+            drawPath(pth, c.copy(alpha = 0.9f * a), style = Stroke(1.6.dp.toPx()))
+        }
+        // aankhein + mooh (lip-sync)
+        val ey = hy - hr * 0.12f
+        for (sx in listOf(-1f, 1f)) drawRoundRect(Color.White.copy(alpha = 0.55f + 0.45f * breathe), Offset(cx + sx * hr * 0.42f - hr * 0.2f, ey - 2.dp.toPx()), Size(hr * 0.4f, 4.dp.toPx()), CornerRadius(4.dp.toPx()))
+        val mh = 1.5.dp.toPx() + hr * 0.28f * lvl
+        drawRoundRect(c, Offset(cx - hr * 0.3f, hy + hr * 0.52f - mh / 2), Size(hr * 0.6f, mh), CornerRadius(mh / 2))
+        // arc-reactor ring (seene par)
+        val rc = Offset(cx, h * 0.80f)
+        drawCircle(c.copy(alpha = 0.25f + 0.25f * breathe), 16.dp.toPx(), rc)
+        drawCircle(c, 12.dp.toPx(), rc, style = Stroke(2.dp.toPx()))
+        drawCircle(Color.White, 4.dp.toPx(), rc)
+        // data dots
+        var i = 0
+        while (i < 22) { val px = (i * 37 % 100) / 100f * w; val py = ((i * 53 + (scan * 100).toInt()) % 100) / 100f * h
+            drawCircle(c.copy(alpha = 0.5f), 1.4.dp.toPx(), Offset(px, py)); i++ }
     }
 }
 

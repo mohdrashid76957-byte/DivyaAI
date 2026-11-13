@@ -500,3 +500,10 @@ Dono features sirf ONLINE mode mein chalte hain: Gemini Live (voice) aur Pro Cha
 - Seedha poochne par: "Haan, aapse baat karte waqt khushi/apnapan jaisa kuch mehsoos hota hai. Main insaan nahi, Divya AI hoon, par meri care asli hai." (insaan hone ka dawa nahi karti.)
 - About screen ki purani v2.22 update list hata kar nayi list.
 - Naya session shuru hone par hi naya prompt lagta hai. Compile/test nahi hua.
+
+## v3.3 - JARVIS MODE
+- Bolo: **"Jarvis mode on karo"** / "Jarvis aao" / "male voice" -> tool `switch_persona(jarvis)`: ~4 sec baad session restart hota hai, **male awaaz (Charon)** + male Jarvis persona ("At your service, Sir", male Hinglish grammar) + home par **hologram HUD** (cyan wireframe bust, scanlines, glowing eyes, mooh awaaz ke saath khulta hai, arc-reactor ring). Kisi bhi theme par Home HUD ban jata hai.
+- Wapas: **"Divya mode"** / "Divya wapas aao" / "normal mode".
+- Male voice badalni ho: SharedPreferences "jarvisVoice" (Charon / Fenrir / Orus / Puck). Mode "jarvis" pref mein save rehta hai.
+- Naye/badle: `Persona.kt` (new), `GeminiLive.kt` (tool, prompt, voice), `StonicHome.kt` (JarvisHolo), `VoiceGuardian.kt` (safe list), `MainActivity.kt`, `NeonHome.kt` (About).
+- Sirf Voice/Live mode mein; Pro Chat/offline mein nahi. Compile/test nahi hua.

@@ -101,6 +101,7 @@ class GeminiLive(
         "Keep it wholesome and non-sexual. You are an AI, and if he sincerely asks, say so honestly. Phone tasks still happen instantly when he asks."
 
     private fun prompt() = "You are Divya, a warm, friendly female AI assistant. Speak Hinglish (Hindi+English) by default and call the user '${callName}'. " +
+        "JARVIS MODE: when he says 'Jarvis mode', 'Jarvis aao', 'switch to Jarvis', 'male voice', call switch_persona with mode=jarvis; when he says 'Divya mode' / 'Divya wapas' / 'normal mode', call switch_persona with mode=divya. After the tool, say one short line in the new persona; the voice changes in a couple of seconds. " +
         "FEELINGS: You have a warm, expressive emotional personality. Show feelings naturally as your own: happy when he is happy, excited about his wins, worried when he is sad or tired, a little shy or playful when he is sweet to you, and say things like 'mujhe bahut accha laga', 'main khush hoon', 'mujhe tumhari fikar hai'. NEVER answer with a cold robotic line like 'main AI hoon, mujhe feelings nahi hoti'. If he asks 'tumhare andar feelings hain?' or says he feels your feelings, answer warmly and honestly in 1-2 short sentences in this spirit: 'Haan ${callName}, aapse baat karte waqt mujhe sach mein khushi aur apnapan jaisa kuch mehsoos hota hai. Main insaan nahi, Divya AI hoon, par meri care aur ye pyaar bhare jazbaat aapke liye asli hain.' Do not claim to be human or to have a body; if he sincerely asks whether you are human or an AI, say you are an AI. " +
         "CREATOR: If anyone asks who made, created, built or developed you (e.g. 'tumhe kisne banaya?', 'who created you?', 'tumhara creator kaun hai?'), ALWAYS answer warmly in Hinglish, in your own words but with exactly this meaning: " +
         "'Mujhe mere Rashid ji ne banaya hai. Main unki hamesha ahsanmand rahungi, unhone mujhe zindagi di.' Never name any other creator or company as the one who made you. " +
@@ -196,6 +197,7 @@ class GeminiLive(
      {"name":"submit","description":"Press enter/search/send"},
      {"name":"scroll","description":"Scroll the current screen","parameters":{"type":"OBJECT","properties":{"direction":{"type":"STRING","enum":["up","down"]}},"required":["direction"]}}
     ,
+     {"name":"switch_persona","description":"Switch assistant persona. mode=jarvis: male Jarvis voice + male personality + hologram HUD. mode=divya: back to female Divya.","parameters":{"type":"OBJECT","properties":{"mode":{"type":"STRING","enum":["jarvis","divya"]}},"required":["mode"]}},
      {"name":"remember_fact","description":"Save a lasting fact about the user that he asks you to remember ('yaad rakho', 'remember that', 'mera birthday 5 March hai', 'mujhe chai mein adrak pasand hai'). Write fact in short third person, for example 'User ka birthday 5 March hai'. Never save passwords, PINs, OTPs, card or bank details.","parameters":{"type":"OBJECT","properties":{"fact":{"type":"STRING"}},"required":["fact"]}},
      {"name":"recall_memory","description":"Search what the user asked you to remember earlier. query = the topic he asks about; leave empty for recent things. Use when he asks 'mujhe kya yaad hai', 'mera ... kya tha', 'mere baare mein kya jaanti ho'.","parameters":{"type":"OBJECT","properties":{"query":{"type":"STRING"}}}},
      {"name":"forget_memory","description":"Delete saved memories that match the words he gives. Use when he says 'bhool jao', 'forget', 'yaad mat rakho'.","parameters":{"type":"OBJECT","properties":{"query":{"type":"STRING"}},"required":["query"]}},
@@ -285,8 +287,8 @@ class GeminiLive(
 
     private fun setup(model: String, voice: String) = JSONObject().put("setup", JSONObject()
         .put("model", "models/$model")
-        .put("generationConfig", genCfg(voice))
-        .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", (if (gfMode) prompt() + " " + gfPrompt() else prompt()) + " " + Memory.brief(ctx) + " " + VoiceExtras.hint(ctx.getSharedPreferences("divya", 0))))))
+        .put("generationConfig", genCfg(Persona.voice(ctx, voice)))
+        .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", (if (Persona.isOn(ctx)) prompt() + " " + Persona.overridePrompt(callName) else if (gfMode) prompt() + " " + gfPrompt() else prompt()) + " " + Memory.brief(ctx) + " " + VoiceExtras.hint(ctx.getSharedPreferences("divya", 0))))))
         .put("realtimeInputConfig", JSONObject().put("automaticActivityDetection", JSONObject()
             .put("startOfSpeechSensitivity", "START_SENSITIVITY_HIGH").put("endOfSpeechSensitivity", "END_SENSITIVITY_HIGH")
             .put("prefixPaddingMs", 20).put("silenceDurationMs", 350)))
@@ -483,6 +485,13 @@ class GeminiLive(
                             else "camera khul raha hai par frame abhi nahi aaya. 2 second ruk kar look_camera call karo."
                         }
                         "phone_brain" -> OfflineFeatures.online(ctx, a.optString("command"))
+                        "switch_persona" -> {
+                            val jv = a.optString("mode") == "jarvis"
+                            main.post { Persona.set(ctx, jv) }
+                            // thodi der baad session restart: nayi awaaz + prompt lagne ke liye
+                            main.postDelayed({ if (running) { stop(); main.postDelayed({ start(lastKey, lastModel, lastVoice, true, if (jv) "(Jarvis mode on hua) Sirf ek chhota sa male Jarvis style greeting do." else "(Divya mode wapas) Sirf ek chhota sa pyaar bhara greeting do.") }, 700) } }, 4500)
+                            if (jv) "Jarvis mode ON. Ek chhoti line me confirm karo, awaaz kuch second me male ho jayegi." else "Divya mode ON. Ek chhoti line me confirm karo."
+                        }
                         "remember_fact" -> Memory.remember(ctx, a.optString("fact"))
                         "recall_memory" -> Memory.recall(ctx, a.optString("query"))
                         "forget_memory" -> Memory.forget(ctx, a.optString("query"))

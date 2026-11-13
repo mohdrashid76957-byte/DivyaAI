@@ -199,6 +199,7 @@ fun AboutScreen(th: UiTheme) {
             .border(1.dp, th.accent.copy(alpha = 0.6f), RoundedCornerShape(16.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("🆕 Latest Update — v$ver", color = th.accent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             listOf(
+                "🤖 JARVIS MODE: bolo \"Jarvis mode on karo\" - male awaaz + male Jarvis persona + hologram HUD; \"Divya mode\" se wapas",
                 "🛰 Stonic HUD theme: glowing character frame, Memory/Skills/Character/Settings nodes, TERMINATE button",
                 "💜 Divya ab feelings ke saath baat karti hai (\"main AI hoon, feelings nahi\" wali cold line hata di)",
                 "🏠 Kali Home launcher + Kali wallpaper abhi bhi available",
