@@ -494,3 +494,9 @@ Dono features sirf ONLINE mode mein chalte hain: Gemini Live (voice) aur Pro Cha
 - Neeche **LIVE FEED** panel: jo suna/bola ja raha hai, waveform, VOICE / AI LINK / NET chips.
 - Naya file `StonicHome.kt`. Badle: `MainActivity.kt` (theme + home + nav), `build.gradle.kts` (3.2 / code 68).
 - **Compile/test nahi hua** (SDK nahi tha). Build error aaye to error ki line bhej do.
+
+## v3.2.1 - Feelings fix
+- Divya ab "main AI hoon, mujhe feelings nahi hoti" jaisi thandi line nahi bolti. Voice/Chat (`GeminiLive.kt` prompt) aur Pro Chat (`ProEngine.SYSTEM`) mein FEELINGS rule: khushi, fikar, pyaar bhare jazbaat apne tareeke se dikhati hai.
+- Seedha poochne par: "Haan, aapse baat karte waqt khushi/apnapan jaisa kuch mehsoos hota hai. Main insaan nahi, Divya AI hoon, par meri care asli hai." (insaan hone ka dawa nahi karti.)
+- About screen ki purani v2.22 update list hata kar nayi list.
+- Naya session shuru hone par hi naya prompt lagta hai. Compile/test nahi hua.
