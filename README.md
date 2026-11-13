@@ -513,3 +513,8 @@ Dono features sirf ONLINE mode mein chalte hain: Gemini Live (voice) aur Pro Cha
 
 ## v3.3.2
 - Privacy password badla (License.kt HASH). Naya password sirf hash ke roop mein code mein hai, plain text nahi.
+
+## v3.4 - Creator photo
+- Koi puche "tumhe kisne banaya?" to Divya jawab ke saath Rashid ji ki photo bhi screen par dikhati hai (popup card, 15 sec baad band ya tap karke band).
+- Online/voice: tool `show_creator_photo`. Offline/text: OfflineSmart ka creator jawab bhi card kholta hai. Naye: `Creator.kt`, `res/drawable/creator_photo.jpg`.
+- Photo badalni ho to wahi naam (creator_photo.jpg) se replace karo. Compile/test nahi hua.

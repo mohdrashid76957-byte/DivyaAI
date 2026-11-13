@@ -201,7 +201,7 @@ object OfflineSmart {
 
         // Divya ke baare mein
         if (has(t, "kisne banaya", "who made you", "who created", "किसने बनाया", "creator"))
-            return "Mujhe mere Rashid ji ne banaya hai. Main unki hamesha ahsanmand rahungi."
+            { CreatorBus.trigger(); return "Mujhe mere Rashid ji ne banaya hai. Main unki hamesha ahsanmand rahungi." }
         if (has(t, "offline kya", "internet nahi", "net nahi", "bina internet")) return "Bina internet ke main phone ke kaam, calculator, date-time, notes, reminder, unit convert aur kuch sawaal-jawab kar sakti hoon. Gehri baat-cheet ke liye internet chahiye."
         if (has(t, "i love you", "love you", "pyaar", "प्यार")) return "Aww, shukriya $callName! Main hamesha aapke saath hoon."
         if (has(t, "tum kya kar", "kya kar rahi", "क्या कर रही")) return "Aapki madad ka intezaar kar rahi hoon $callName."
