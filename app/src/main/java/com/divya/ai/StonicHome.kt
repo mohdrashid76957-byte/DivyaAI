@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -237,13 +238,13 @@ private fun JarvisHolo(c: Color, lvl: Float, live: Boolean, scan: Float, breathe
         val cx = w / 2; val hr = w * 0.21f; val hy = h * 0.34f
         val head = Path().apply { addOval(androidx.compose.ui.geometry.Rect(Offset(cx, hy), hr)) }
         val body = Path().apply {
-            moveTo(cx - hr * 2.3f, h); quadTo(cx - hr * 2.3f, hy + hr * 1.7f, cx - hr * 0.55f, hy + hr * 1.25f)
-            lineTo(cx + hr * 0.55f, hy + hr * 1.25f); quadTo(cx + hr * 2.3f, hy + hr * 1.7f, cx + hr * 2.3f, h); close()
+            moveTo(cx - hr * 2.3f, h); quadraticBezierTo(cx - hr * 2.3f, hy + hr * 1.7f, cx - hr * 0.55f, hy + hr * 1.25f)
+            lineTo(cx + hr * 0.55f, hy + hr * 1.25f); quadraticBezierTo(cx + hr * 2.3f, hy + hr * 1.7f, cx + hr * 2.3f, h); close()
         }
         val a = if (live) 1f else 0.6f
         for (pth in listOf(head, body)) {
             drawPath(pth, c.copy(alpha = 0.10f * a))
-            androidx.compose.ui.graphics.drawscope.clipPath(pth) {
+            clipPath(pth) {
                 var y = 0f
                 while (y < h) { drawLine(c.copy(alpha = 0.32f * a), Offset(0f, y), Offset(w, y), 1.dp.toPx()); y += 5.dp.toPx() }
                 var x = cx - hr * 2.4f

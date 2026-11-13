@@ -507,3 +507,6 @@ Dono features sirf ONLINE mode mein chalte hain: Gemini Live (voice) aur Pro Cha
 - Male voice badalni ho: SharedPreferences "jarvisVoice" (Charon / Fenrir / Orus / Puck). Mode "jarvis" pref mein save rehta hai.
 - Naye/badle: `Persona.kt` (new), `GeminiLive.kt` (tool, prompt, voice), `StonicHome.kt` (JarvisHolo), `VoiceGuardian.kt` (safe list), `MainActivity.kt`, `NeonHome.kt` (About).
 - Sirf Voice/Live mode mein; Pro Chat/offline mein nahi. Compile/test nahi hua.
+
+## v3.3.1
+- Build fix: StonicHome.kt mein `quadTo` -> `quadraticBezierTo` aur `clipPath` import (compile error).
