@@ -550,3 +550,9 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Floating toy ka size 80% chhota kiya: 160dp -> 32dp (`FloatingToy.SIZE_DP` mein badal sakte ho).
 - Toy ko ungli se drag karke kahin bhi rakh sakte ho. Position save hoti hai (restart ke baad bhi wahi rahegi).
 - Version 3.10 (versionCode 79). Compile/test nahi hua.
+
+## v3.11 - Music/video ruk na + bheed mein bolne ka jawab
+- **Wake word + music/video:** gaana ya video chal raha ho to wake listener mic nahi kholta, isliye media baar-baar pause/ruk nahi hoga. Wake word tabhi sunega jab koi media na chal raha ho.
+- **Voice reply:** Divya ab awaaz mein list ya bullets nahi bolegi, seedhi baatcheet wali lines mein jawab dega.
+- **Bheed mein sunna:** agar Divya aapki baat nahi sun paati, to Settings > Voice Guardian mein Listen mode "Everyone" rakhein (Owner only mode shor mein aapko match nahi kar paata).
+- Version 3.11 (versionCode 80). Compile/test nahi hua.

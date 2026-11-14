@@ -78,6 +78,8 @@ class WakeService : Service() {
         // Gemini session chal raha ho to mic bilkul free: recognizer band, bas thodi der mein dobara check
         if (WakeBus.liveActive) { releaseMic(); schedule(1500); return }
         if (!micOk(this) || !SpeechRecognizer.isRecognitionAvailable(this)) { schedule(3000); return }
+        // v3.11: gaana / video chal raha ho to wake listener mic nahi kholta (warna audio focus se media baar-baar ruk jata tha)
+        if ((getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager).isMusicActive) { releaseMic(); schedule(2000); return }
         listen()
     }
 
