@@ -574,3 +574,9 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Screen ka rainbow border ab sirf tab dikhta hai jab Divya active ho (sunna ya bolna). Divya band hone par border nahi dikhega.
 - Naye theme: Sunset Orange, Ocean Teal, Rose Pink, Gold Luxe. Settings ke theme chips mein milenge.
 - Version 3.14 (versionCode 83). Compile/test nahi hua.
+
+## v3.15 - Divya Core live wallpaper
+- Naya live wallpaper: "Divya Core". Blue AI reactor core, ghoomte HUD rings, gold arcs, energy waves, aur scanning line. 12 second ka seamless loop, 9:16, muted, bina text/logo.
+- Settings mein "Divya Core live wallpaper set karo" button se system ka live wallpaper chooser khulta hai. Wahan "Divya Core" chuno.
+- Video `assets/wallpaper/divya_core_wallpaper.mp4` mein hai (1080x1920). Screen band ho to playback pause hota hai.
+- Version 3.15 (versionCode 84). Compile/test nahi hua.

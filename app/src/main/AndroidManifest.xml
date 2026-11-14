@@ -68,6 +68,12 @@
         </provider>
         <!-- v3.7: Toy avatar gallery (Divya design) -->
         <activity android:name=".OverlayToysActivity" android:exported="false" android:label="Toy avatar" android:screenOrientation="portrait" />
+        <!-- v3.15: Divya Core live wallpaper -->
+        <service android:name=".DivyaLiveWallpaper" android:exported="true"
+            android:permission="android.permission.BIND_WALLPAPER" android:label="Divya Core">
+            <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/wallpaper" />
+        </service>
         <receiver android:name=".SchedReceiver" android:exported="false" />
         <receiver android:name=".TermuxResultReceiver" android:exported="false" />
         <receiver android:name=".BootReceiver" android:exported="true">
