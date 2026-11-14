@@ -443,7 +443,7 @@ class GeminiLive(
                         "termux_open" -> if (Termux.open(ctx)) "done: Termux khul gaya" else "failed: Termux install nahi hai ya khul nahi paaya"
                         "web_search" -> bg("Web search", 12000) { PhoneTools.webSearch(ctx, a.optString("query")) }
                         "open_in_chrome" -> PhoneTools.openInBrowser(ctx, a.optString("query"))
-                        "quick_settings" -> QuickSettings.run(ctx, a.optString("command")),
+                        "quick_settings" -> QuickSettings.run(ctx, a.optString("command"))
                         "get_weather" -> PhoneTools.weather(ctx, a.optString("place"))
                         "open_google_search" -> PhoneTools.openGoogle(ctx, a.optString("query"))
                         "where_am_i" -> PhoneTools.whereAmI(ctx, a.optBoolean("show_map", false))
