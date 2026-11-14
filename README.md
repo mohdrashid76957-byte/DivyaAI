@@ -569,3 +569,8 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Settings mein "Line jagah" tap karke chuno: Chaaron taraf, Dono side, Upar, ya Neeche.
 - Naya style lagane ke liye app dobara kholna padega.
 - Version 3.13 (versionCode 82). Compile/test nahi hua.
+
+## v3.14 - Idle par rainbow border hata diya, 4 naye colour styles
+- Screen ka rainbow border ab sirf tab dikhta hai jab Divya active ho (sunna ya bolna). Divya band hone par border nahi dikhega.
+- Naye theme: Sunset Orange, Ocean Teal, Rose Pink, Gold Luxe. Settings ke theme chips mein milenge.
+- Version 3.14 (versionCode 83). Compile/test nahi hua.

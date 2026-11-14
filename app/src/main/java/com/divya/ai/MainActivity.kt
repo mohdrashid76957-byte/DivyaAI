@@ -88,6 +88,27 @@ val themes = listOf(
         "Boss, dil karda hai tere naal gall karan da...",
         listOf(Triple("APPS", Screen.Apps, Icons.Filled.Apps), Triple("THEMES", Screen.Settings, Icons.Filled.Palette),
             Triple("CHAT", Screen.Chat, Icons.Filled.Chat), Triple("TOOLS", Screen.Quick, Icons.Filled.Build)), hud = true),
+    // v3.14: 4 naye colour styles
+    UiTheme("Sunset Orange", R.drawable.divya_full, false,
+        Brush.verticalGradient(listOf(Color(0xFF2A0B05), Color(0xFF8A3A0E))), Color.White, Color(0xFFFF9A3C),
+        "Hello Boss! 🌅\nKya plan hai aaj?",
+        listOf(Triple("Home", Screen.Home, Icons.Filled.Home), Triple("Chat", Screen.Chat, Icons.Filled.Chat),
+            Triple("Apps", Screen.Apps, Icons.Filled.Apps), Triple("Settings", Screen.Settings, Icons.Filled.Settings))),
+    UiTheme("Ocean Teal", R.drawable.divya_dark, true,
+        Brush.verticalGradient(listOf(Color(0xFF021F24), Color(0xFF0B6B73))), Color.White, Color(0xFF2EE6D6),
+        "Hello Boss! 🌊\nBolo, main sun rahi hoon.",
+        listOf(Triple("Home", Screen.Home, Icons.Filled.Home), Triple("Chat", Screen.Chat, Icons.Filled.Chat),
+            Triple("Apps", Screen.Apps, Icons.Filled.Apps), Triple("Settings", Screen.Settings, Icons.Filled.Settings))),
+    UiTheme("Rose Pink", R.drawable.divya_light, true,
+        Brush.verticalGradient(listOf(Color(0xFFFFE6F0), Color(0xFFFFF5FA))), Color(0xFF4A1230), Color(0xFFE84D8A),
+        "Hi! Main Divya 🌸\nChalo baat karte hain!",
+        listOf(Triple("Home", Screen.Home, Icons.Filled.Home), Triple("Chat", Screen.Chat, Icons.Filled.Chat),
+            Triple("Apps", Screen.Apps, Icons.Filled.Apps), Triple("Settings", Screen.Settings, Icons.Filled.Settings))),
+    UiTheme("Gold Luxe", R.drawable.divya_full, false,
+        Brush.verticalGradient(listOf(Color(0xFF0F0B02), Color(0xFF3A2A06))), Color.White, Color(0xFFFFC94D),
+        "Hello Boss! ✨\nAaj kya karein?",
+        listOf(Triple("Home", Screen.Home, Icons.Filled.Home), Triple("Chat", Screen.Chat, Icons.Filled.Chat),
+            Triple("Apps", Screen.Apps, Icons.Filled.Apps), Triple("Settings", Screen.Settings, Icons.Filled.Settings))),
     // Maya-style: light dashboard + floating avatar + cards + centre mic
     UiTheme("Maya Style", R.drawable.divya_full, false,
         Brush.verticalGradient(listOf(Color(0xFFCFE3FF), Color(0xFFF4F8FF))), Color(0xFF14233F), Color(0xFF1FB6E8),
@@ -396,7 +417,7 @@ fun DivyaApp(ctx: Context) {
             }
         }
     }
-    if (glowOn) ScreenLineAuto(if (micNow) Color(0xFF00FF40) else th.accent, micNow)
+    if (glowOn && micNow) ScreenLineAuto(if (micNow) Color(0xFF00FF40) else th.accent, micNow)   // v3.14: idle par border nahi
     BgOverlay()
     // Live screen sharing ka chhota button (session chalu hone par dikhta hai). ON hone par Divya aapki screen dekhti rehti hai.
     if (live.running && screen != Screen.Scan && screen != Screen.Chat && screen != Screen.ProChat) {
