@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Divya Anime</title>
+<style>
+  :root { --glow: #c58bff; }
+  html, body { height:100%; margin:0; background:transparent; overflow:hidden; }
+  body { display:flex; align-items:center; justify-content:center; }
+  .orb { width:88%; height:88%; border-radius:50%; overflow:hidden; position:relative;
+         border:2px solid var(--glow); box-shadow:0 0 18px var(--glow), 0 0 40px rgba(255,255,255,.08) inset;
+         animation: float 3.2s ease-in-out infinite, pulse 2.4s ease-in-out infinite; background:#05070d; }
+  .orb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .ring { position:absolute; inset:-6px; border-radius:50%; border:1px dashed var(--glow); opacity:.55;
+          animation: spin 9s linear infinite; }
+  @keyframes float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+  @keyframes pulse { 0%,100% { box-shadow:0 0 14px var(--glow) } 50% { box-shadow:0 0 28px var(--glow) } }
+  @keyframes spin { to { transform: rotate(360deg) } }
+</style></head>
+<body>
+  <div class="orb"><img src="https://appassets.androidplatform.net/assets/divya-toys/img/anime.jpg" alt="Divya Anime"></div>
+  <div class="ring"></div>
+</body></html>

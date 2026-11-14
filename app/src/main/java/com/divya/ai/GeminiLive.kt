@@ -28,6 +28,7 @@ class GeminiLive(
     private var ws: WebSocket? = null
     private var rec: AudioRecord? = null
     private var track: AudioTrack? = null
+    private var headset: HeadsetAudioRouter? = null   // v3.7: Settings > Headset audio route (default OFF)
     // Playback ek alag thread par + lock: websocket thread release hue AudioTrack par write nahi karega
     // (isi se "Unable to retrieve AudioTrack pointer for write()" error aata tha).
     private val trackLock = Any()
@@ -214,6 +215,7 @@ class GeminiLive(
         if (running) return
         if (!LicenseGate.isActive(ctx)) { state("Error: License activate karo"); return }
         lastKey = key; lastModel = model; lastVoice = voice
+        if (ctx.getSharedPreferences("divya", 0).getBoolean("headsetRoute", false)) { headset?.stop(); headset = HeadsetAudioRouter(ctx).also { it.start() } }
         fastThink = ctx.getSharedPreferences("divya", 0).getBoolean("fastThink", true)
         nativeSearch = ctx.getSharedPreferences("divya", 0).getBoolean("nativeSearchOn", false)   // experimental, default OFF
         ready = false; running = true; endAfter = false; heard.setLength(0); WakeBus.liveActive = true; lastAct = System.currentTimeMillis(); mic = withMic; pending = firstText; newTurn = true
@@ -732,6 +734,7 @@ class GeminiLive(
         AvatarBus.moveTo(0); AvatarBus.level = 0f; AvatarBus.speaking = false; AvatarBus.micLevel = 0f; AvatarBus.say("")
         updateGlow()
         LiveKeepService.stop(ctx)
+        headset?.stop(); headset = null
         state(msg)
     }
 }

@@ -2,7 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "com.divya.ai"
     compileSdk = 34
-    defaultConfig { applicationId = "com.divya.ai"; minSdk = 26; targetSdk = 34; versionCode = 74; versionName = "3.5" }
+    defaultConfig { applicationId = "com.divya.ai"; minSdk = 26; targetSdk = 34; versionCode = 77; versionName = "3.8" }
     signingConfigs {
         getByName("debug") {
             if (file("divya.keystore").exists()) {
@@ -39,4 +39,6 @@ dependencies {
     implementation("com.google.mlkit:image-labeling:17.0.9")
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.mlkit:translate:17.0.3")
+    // v3.7: overlay toys (WebView + asset loader), Jarvis se
+    implementation("androidx.webkit:webkit:1.12.0")
 }

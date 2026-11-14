@@ -528,3 +528,12 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 **Abhi nahi jud paaye (agle steps):** Jarvis ka Vosk offline wake word (mic indicator ke bina), agent task engine (verified multi-step), MediaProjection vision/UI grounding, YouTube Data API client, headset audio router (isme audio mode badalta hai, toggle ke saath ayega), Jarvis overlay toys. Ye Divya ke current code se takraate hain, isliye alag se, dhyan se jodenge.
 
 **Dhyan:** ye code is session mein Android Studio / phone par compile aur test nahi hua (SDK nahi tha). Build error aaye to error ki line bhej do.
+
+
+## v3.7 - YouTube API, headset route, toy avatars (Jarvis se)
+- **YouTube Data API:** Settings > "YouTube Data API key" (khali = purana tarika). Key ho to "YouTube par ... chalao" pehle official API se top video dhundhta hai. File: `YouTubeApi.kt`, `DivyaService.playOnYoutube`.
+- **Headset audio route (default OFF):** Settings > "Headset audio route" ON karo. Bluetooth / wired headset connect hone par Gemini ki awaaz aur mic headset par jaate hain; headset na ho to loudspeaker. Ye phone ka audio mode badalta hai, isliye call par asar ho sakta hai. File: `HeadsetAudioRouter.kt`.
+- **Toy avatars (Divya design):** Settings > "Toy avatar chuno" se 6 Divya avatars (3D, Anime, Ice, Gold, Pink, Hero) mein se chuno. Har toy Divya ki apni images aur neon glow ke saath float karta hai. "Floating toy avatar" ON karo to screen par chhota toy dikhega (Display over other apps permission chahiye, touch ko block nahi karta). Files: `OverlayToys.kt`, `assets/divya-toys/`.
+- Version 3.8 (versionCode 77). Toy design Jarvis se copy nahi, Divya ke avatar par banaya gaya hai.
+- Wake word: pichla wala hi hai (koi badlav nahi). Vosk is version mein nahi hai.
+- **Dhyan:** ye code compile/test nahi hua. Toy floating window aur headset routing phone par test karni padegi. Error ya asar dikhe to bata dena.

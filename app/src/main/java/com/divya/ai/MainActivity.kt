@@ -682,6 +682,21 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
             else { wk = it; prefs.edit().putBoolean("wake", it).apply(); if (it) WakeService.start(sctx) else WakeService.stop(sctx) }
         })
     }
+    var yk by remember { mutableStateOf(prefs.getString("ytApiKey", "") ?: "") }
+    OutlinedTextField(yk, { yk = it; prefs.edit().putString("ytApiKey", it.trim()).apply() }, Modifier.fillMaxWidth(),
+        label = { Text("YouTube Data API key (optional, khali = purana tarika)") }, singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = th.text, unfocusedTextColor = th.text))
+    var hr by remember { mutableStateOf(prefs.getBoolean("headsetRoute", false)) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Headset audio route: Bluetooth/wired headset par awaaz (default OFF, call speaker par asar ho sakta hai)", color = th.text, modifier = Modifier.weight(1f))
+        Switch(hr, { hr = it; prefs.edit().putBoolean("headsetRoute", it).apply() })
+    }
+    var ft by remember { mutableStateOf(ToyPrefs.enabled(sctx)) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Floating toy avatar (screen par chhota animated toy; 'Display over other apps' chahiye)", color = th.text, modifier = Modifier.weight(1f))
+        Switch(ft, { ft = it; ToyPrefs.setEnabled(sctx, it); FloatingToy.sync(sctx) })
+    }
+    Btn(th, "🎭 Toy avatar chuno") { sctx.startActivity(android.content.Intent(sctx, OverlayToysActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
     var nu by remember { mutableStateOf(prefs.getBoolean("needUnlock", true)) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("Safety: phone locked ho to Divya koi kaam na kare (sirf aap unlock karke chalao)", color = th.text, modifier = Modifier.weight(1f))

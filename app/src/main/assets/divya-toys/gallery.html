@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Divya Toy Avatar</title>
+<style>
+  html, body { margin:0; min-height:100%; background:#05070d; color:#dff7ff; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+  h1 { font-size:18px; letter-spacing:2px; text-align:center; margin:20px 0 6px; color:#8ef6ff; }
+  p { text-align:center; font-size:13px; opacity:.7; margin:0 16px 16px; }
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; padding:0 16px 24px; }
+  .card { background:#0b1220; border:1px solid #1f3b52; border-radius:16px; padding:12px; color:inherit; cursor:pointer; }
+  .card img { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:50%; display:block; }
+  .card span { display:block; margin-top:8px; font-size:13px; }
+  .card.sel { border-color:#8ef6ff; box-shadow:0 0 14px #8ef6ff55; }
+</style></head>
+<body>
+<h1>DIVYA TOY AVATAR</h1>
+<p>Ek chuno. Floating toy screen par dikhega.</p>
+<div class="grid"><button class="card" onclick="pick('div3d')"><img src="img/3d.jpg" alt="Divya 3D"><span>Divya 3D</span></button><button class="card" onclick="pick('divanime')"><img src="img/anime.jpg" alt="Divya Anime"><span>Divya Anime</span></button><button class="card" onclick="pick('divice')"><img src="img/ice.png" alt="Divya Ice"><span>Divya Ice</span></button><button class="card" onclick="pick('divgold')"><img src="img/gold.jpg" alt="Divya Gold"><span>Divya Gold</span></button><button class="card" onclick="pick('divpink')"><img src="img/pink.jpg" alt="Divya Pink"><span>Divya Pink</span></button><button class="card" onclick="pick('divhero')"><img src="img/hero.png" alt="Divya Hero"><span>Divya Hero</span></button></div>
+<script>
+  function pick(n) {
+    document.querySelectorAll('.card').forEach(c => c.classList.toggle('sel', c.getAttribute('onclick').includes("'"+n+"'")));
+    if (window.DivyaToyPicker) window.DivyaToyPicker.selectAvatar(n);
+  }
+  window.setSelectedAvatar = function (n) {
+    document.querySelectorAll('.card').forEach(c => c.classList.toggle('sel', c.getAttribute('onclick').includes("'"+n+"'")));
+  };
+  if (window.DivyaToyPicker) window.DivyaToyPicker.pageReady();
+</script>
+</body></html>

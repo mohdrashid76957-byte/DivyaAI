@@ -327,6 +327,18 @@ class DivyaService : AccessibilityService() {
     }
 
     fun playOnYoutube(q: String): String {
+        // v3.6: YouTube Data API (Settings > YouTube API key, optional). Key na ho / fail ho to purana tarika.
+        val ytKey = getSharedPreferences("divya", 0).getString("ytApiKey", "") ?: ""
+        if (ytKey.isNotBlank()) {
+            YouTubeApiClient.searchTopVideo(ytKey, q)?.let { v ->
+                val ytp0 = "com.google.android.youtube"
+                val wi = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("vnd.youtube:${v.videoId}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (packageManager.getLaunchIntentForPackage(ytp0) != null) wi.setPackage(ytp0)
+                try { startActivity(wi) } catch (_: Exception) {}
+                waitOpen(ytp0, 5000)
+                if (waitPlayer(10000)) { ensurePlaying(); return "done: playing '${v.title}' (YouTube API)" }
+            }
+        }
         val ytp = "com.google.android.youtube"
         val hasApp = packageManager.getLaunchIntentForPackage(ytp) != null
         // Tarika 1: video ID nikalo -> app mein seedha kholo (pehle vnd.youtube:, phir https watch link)
