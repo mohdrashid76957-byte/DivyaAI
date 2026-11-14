@@ -545,3 +545,8 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - **Abhi ye sirf library hai:** koi voice tool ya button ise chalata nahi. Ise Gemini tool (jaise `agent_task`) se jodne ka next step hai.
 - Version 3.9 (versionCode 78).
 - **Dhyan:** compile/test nahi hua. Verify steps accessibility par chalte hain, to Accessibility permission ON honi chahiye.
+
+## v3.10 - Floating toy chhota + draggable
+- Floating toy ka size 80% chhota kiya: 160dp -> 32dp (`FloatingToy.SIZE_DP` mein badal sakte ho).
+- Toy ko ungli se drag karke kahin bhi rakh sakte ho. Position save hoti hai (restart ke baad bhi wahi rahegi).
+- Version 3.10 (versionCode 79). Compile/test nahi hua.

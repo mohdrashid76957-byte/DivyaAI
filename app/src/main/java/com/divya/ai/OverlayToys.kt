@@ -9,6 +9,10 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.widget.FrameLayout
+import kotlin.math.abs
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
@@ -74,25 +78,35 @@ class OverlayToysActivity : Activity() {
     }
 }
 
-/** Floating toy: TYPE_APPLICATION_OVERLAY window, touch pass-through (screen ko block nahi karta). */
+/**
+ * Floating toy: TYPE_APPLICATION_OVERLAY window.
+ * v3.10: size 80% chhota (160dp -> 32dp, SIZE_DP se badlo). Ungli se drag karke kahin bhi le jao;
+ * position save hoti hai (toyX / toyY). Touch sirf toy ke chhote area par hi lete hain.
+ */
 object FloatingToy {
-    private var view: WebView? = null
-    private var shownName: String? = null
+    const val SIZE_DP = 32
+    private var frame: FrameLayout? = null
+    private var web: WebView? = null
 
     fun canDraw(c: Context) = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(c)
 
     /** Setting ke hisaab se dikhao / chhupao. */
     fun sync(c: Context) { if (ToyPrefs.enabled(c) && canDraw(c)) show(c) else hide(c) }
 
-    fun refresh(c: Context) { if (view != null) { hide(c); sync(c) } }
+    fun refresh(c: Context) { if (frame != null) { hide(c); sync(c) } }
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     fun show(c: Context) {
-        if (view != null) return
+        if (frame != null) return
         val app = c.applicationContext
+        val dm = app.resources.displayMetrics
+        val size = (SIZE_DP * dm.density).toInt()
+        val slop = (6 * dm.density).toInt()
         val name = ToyPrefs.name(app)
         val wm = app.getSystemService(WindowManager::class.java)
+        val prefs = app.getSharedPreferences("divya", 0)
         val loader = WebViewAssetLoader.Builder().addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(app)).build()
+
         val wv = WebView(app)
         wv.setBackgroundColor(Color.TRANSPARENT)
         wv.settings.javaScriptEnabled = true
@@ -101,25 +115,55 @@ object FloatingToy {
                 loader.shouldInterceptRequest(request.url)
         }
         wv.loadUrl(ToyPrefs.url(name))
-        val size = (160 * app.resources.displayMetrics.density).toInt()
+
+        // Upar ka transparent view touch pakadta hai (drag ke liye); WebView ko touch nahi jaata
+        val catcher = View(app)
+        catcher.setBackgroundColor(Color.TRANSPARENT)
+        val fr = FrameLayout(app)
+        fr.addView(wv, FrameLayout.LayoutParams(size, size))
+        fr.addView(catcher, FrameLayout.LayoutParams(size, size))
+
         val lp = WindowManager.LayoutParams(
             size, size,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         )
-        lp.gravity = Gravity.TOP or Gravity.END
-        lp.x = 16
-        lp.y = (120 * app.resources.displayMetrics.density).toInt()
-        try { wm.addView(wv, lp); view = wv; shownName = name } catch (_: Exception) { wv.destroy() }
+        lp.gravity = Gravity.TOP or Gravity.START
+        lp.x = prefs.getInt("toyX", (16 * dm.density).toInt())
+        lp.y = prefs.getInt("toyY", (120 * dm.density).toInt())
+
+        var downX = 0f; var downY = 0f; var startX = 0; var startY = 0; var moved = false
+        catcher.setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = e.rawX; downY = e.rawY; startX = lp.x; startY = lp.y; moved = false; true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = (e.rawX - downX).toInt(); val dy = (e.rawY - downY).toInt()
+                    if (abs(dx) > slop || abs(dy) > slop) moved = true
+                    lp.x = (startX + dx).coerceIn(0, (dm.widthPixels - size).coerceAtLeast(0))
+                    lp.y = (startY + dy).coerceIn(0, (dm.heightPixels - size).coerceAtLeast(0))
+                    try { wm.updateViewLayout(fr, lp) } catch (_: Exception) {}
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (moved) prefs.edit().putInt("toyX", lp.x).putInt("toyY", lp.y).apply()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        try { wm.addView(fr, lp); frame = fr; web = wv } catch (_: Exception) { wv.destroy() }
     }
 
     fun hide(c: Context) {
-        val wv = view ?: return
-        try { c.applicationContext.getSystemService(WindowManager::class.java).removeView(wv) } catch (_: Exception) {}
-        try { wv.destroy() } catch (_: Exception) {}
-        view = null; shownName = null
+        val fr = frame ?: return
+        try { c.applicationContext.getSystemService(WindowManager::class.java).removeView(fr) } catch (_: Exception) {}
+        try { web?.destroy() } catch (_: Exception) {}
+        frame = null; web = null
     }
 }
