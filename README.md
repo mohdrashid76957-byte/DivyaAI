@@ -591,3 +591,8 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - "Divya Core live wallpaper set karo" ab seedha Divya Core ki preview kholta hai (ACTION_CHANGE_LIVE_WALLPAPER). Ye fail ho to system chooser khulta hai.
 - Video player ke errors logcat mein "DivyaCore" tag par aate hain.
 - Version 3.17 (versionCode 86). Compile/test nahi hua.
+
+## v3.18 - Chhota APK (debug build mein minify + shrink)
+- Debug build mein unused code aur resources hatde hain, isliye APK kaafi chhota hoga. APK ka path aur install process same hai.
+- Agar install ke baad koi feature crash ho (voice, accessibility, wallpaper) to bata dena, keep rules mein add karenge.
+- Version 3.18 (versionCode 87). Compile/test nahi hua.

@@ -2,7 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "com.divya.ai"
     compileSdk = 34
-    defaultConfig { applicationId = "com.divya.ai"; minSdk = 26; targetSdk = 34; versionCode = 86; versionName = "3.17" }
+    defaultConfig { applicationId = "com.divya.ai"; minSdk = 26; targetSdk = 34; versionCode = 87; versionName = "3.18" }
     signingConfigs {
         getByName("debug") {
             if (file("divya.keystore").exists()) {
@@ -17,6 +17,14 @@ android {
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
+    // v3.18: debug APK chhota karne ke liye (APK path wahi rahega, workflow change nahi)
+    buildTypes {
+        getByName("debug") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
 }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
