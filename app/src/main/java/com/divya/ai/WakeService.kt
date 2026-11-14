@@ -141,6 +141,7 @@ class WakeService : Service() {
 
     private fun wake() {
         releaseMic()                                // wake hone par mic turant chhod do
+        JarvisSoundEffects.playWakeSound()          // v3.5: Jarvis wake chime
         WakeBus.liveActive = true
         WakeBus.req = true
         Log.d("WakeService", "WAKE! activity khol rahi hoon")

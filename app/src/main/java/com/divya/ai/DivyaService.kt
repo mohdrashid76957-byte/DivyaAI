@@ -391,7 +391,18 @@ class DivyaService : AccessibilityService() {
         else if (d.length == 10) d = cc + d
         return d
     }
+    /** v3.5: pehle purana exact/LIKE lookup, nahi mile to Jarvis ContactResolver (nickname, mom->ammi, fuzzy). */
     private fun lookupNumber(name: String): String? {
+        lookupNumberExact(name)?.let { return it }
+        return try {
+            when (val r = ContactResolver(this).resolveContact(name)) {
+                is ContactResolutionResult.SingleMatch -> normNumber(r.contact.phoneNumber)
+                is ContactResolutionResult.MultipleMatches -> r.candidates.firstOrNull()?.let { normNumber(it.phoneNumber) }
+                else -> null
+            }
+        } catch (_: Exception) { null }
+    }
+    private fun lookupNumberExact(name: String): String? {
         if (name.none { it.isLetter() } && name.count { it.isDigit() } >= 10) return normNumber(name)
         if (checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return null
         val uri = android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI

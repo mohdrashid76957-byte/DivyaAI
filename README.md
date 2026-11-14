@@ -518,3 +518,13 @@ Dono features sirf ONLINE mode mein chalte hain: Gemini Live (voice) aur Pro Cha
 - Koi puche "tumhe kisne banaya?" to Divya jawab ke saath Rashid ji ki photo bhi screen par dikhati hai (popup card, 15 sec baad band ya tap karke band).
 - Online/voice: tool `show_creator_photo`. Offline/text: OfflineSmart ka creator jawab bhi card kholta hai. Naye: `Creator.kt`, `res/drawable/creator_photo.jpg`.
 - Photo badalni ho to wahi naam (creator_photo.jpg) se replace karo. Compile/test nahi hua.
+
+## v3.5 - Jarvis se merge (pehla step)
+Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur bina Divya ka kuch hataye jod diye:
+- **Jarvis wake chime:** \"Divya\" / \"Wake up Divya\" sunte hi chhota sci-fi chime bajta hai (`JarvisSoundEffects.kt`, `WakeService.wake()` mein).
+- **Jarvis contact resolver:** call / WhatsApp ke liye naam pehle purane tarike se (exact / LIKE) dhundha jata hai; nahi mila to Jarvis ka resolver nickname (mom -> ammi, papa, bhai, didi...) aur fuzzy match se dhundhta hai (`ContactResolver.kt`, `ContactModel.kt`, `DivyaService.lookupNumber`). Contacts permission zaroori hai.
+- Version 3.5 (versionCode 74).
+
+**Abhi nahi jud paaye (agle steps):** Jarvis ka Vosk offline wake word (mic indicator ke bina), agent task engine (verified multi-step), MediaProjection vision/UI grounding, YouTube Data API client, headset audio router (isme audio mode badalta hai, toggle ke saath ayega), Jarvis overlay toys. Ye Divya ke current code se takraate hain, isliye alag se, dhyan se jodenge.
+
+**Dhyan:** ye code is session mein Android Studio / phone par compile aur test nahi hua (SDK nahi tha). Build error aaye to error ki line bhej do.
