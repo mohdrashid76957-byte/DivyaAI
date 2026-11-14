@@ -16,6 +16,65 @@ import org.json.JSONArray
 
 class DivyaService : AccessibilityService() {
     companion object { var instance: DivyaService? = null }
+    // v3.9: accessibility helpers used by the agent engine (Jarvis se, same logic)
+    fun getActiveRootNode(): AccessibilityNodeInfo? {
+        // Prefer Android's active-window root. If unavailable, only accept a window
+        // that Android explicitly marks focused/active; never guess with an arbitrary
+        // application window because dialogs, keyboards, and split-screen can reorder it.
+        val active = rootInActiveWindow
+        if (active != null) return active
+
+        // 2. Fallback to focused application window
+        try {
+            val focusedAppWin = windows.firstOrNull {
+                it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused
+            }
+            if (focusedAppWin?.root != null) return focusedAppWin.root
+
+            // 3. Fallback to active application window
+            val activeAppWin = windows.firstOrNull {
+                it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive
+            }
+            if (activeAppWin?.root != null) return activeAppWin.root
+
+            return null
+        } catch (e: Exception) {
+            android.util.Log.w("DivyaService", "Error resolving active root node across windows: ${e.message}")
+            return null
+        }
+    }
+
+    fun getAppRootNode(): AccessibilityNodeInfo? {
+        return getActiveRootNode()
+    }
+
+    fun findNodeCoveringRect(root: AccessibilityNodeInfo, targetRect: Rect): AccessibilityNodeInfo? {
+        val temp = android.graphics.Rect()
+        fun search(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+            node.getBoundsInScreen(temp)
+            if (Rect.intersects(temp, targetRect)) {
+                for (i in (node.childCount - 1) downTo 0) {
+                    val child = node.getChild(i) ?: continue
+                    val deep = search(child)
+                    if (deep != null) return deep
+                }
+                return node
+            }
+            return null
+        }
+        return search(root)
+    }
+
+    fun findNodeWithInputFocus(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (node.isFocused) return node
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val res = findNodeWithInputFocus(child)
+            if (res != null) return res
+        }
+        return null
+    }
+
     override fun onServiceConnected() {
         instance = this
         if (getSharedPreferences("divya", 0).getBoolean("float", false)) com.divya.ai.glow.FloatingAvatar.show(this)

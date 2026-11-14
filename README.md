@@ -537,3 +537,11 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Version 3.8 (versionCode 77). Toy design Jarvis se copy nahi, Divya ke avatar par banaya gaya hai.
 - Wake word: pichla wala hi hai (koi badlav nahi). Vosk is version mein nahi hai.
 - **Dhyan:** ye code compile/test nahi hua. Toy floating window aur headset routing phone par test karni padegi. Error ya asar dikhe to bata dena.
+
+## v3.9 - Agent task engine (Jarvis se, library)
+- Naye files: `AgentModels.kt`, `AgentTaskEngine.kt`, `ActionVerifier.kt`, `ScreenSignatureCalculator.kt`, `SerializedActionExecutor.kt`.
+- Ye engine har action ke baad screen ko dobara check karta hai (typing, click, scroll verify), ek ek karke mutation chalata hai, aur plan / progress / recovery track karta hai.
+- `DivyaService` mein 4 accessibility helpers joде gaye: `getActiveRootNode`, `getAppRootNode`, `findNodeCoveringRect`, `findNodeWithInputFocus`. Existing functions nahi badle.
+- **Abhi ye sirf library hai:** koi voice tool ya button ise chalata nahi. Ise Gemini tool (jaise `agent_task`) se jodne ka next step hai.
+- Version 3.9 (versionCode 78).
+- **Dhyan:** compile/test nahi hua. Verify steps accessibility par chalte hain, to Accessibility permission ON honi chahiye.
