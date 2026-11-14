@@ -142,6 +142,7 @@ class GeminiLive(
     private val tools = """[
      {"name":"web_search","description":"Search the LIVE internet (Google) and get the answer: latest news / badi khabrein, sports scores, prices, anything current, general facts. ALWAYS use this for news, khabar, score, price and 'google karke batao'. Never do this by typing in the Google app. Takes a few seconds.","parameters":{"type":"OBJECT","properties":{"query":{"type":"STRING"}},"required":["query"]}},
      {"name":"quick_settings","description":"Turn Do Not Disturb on or off, or open WiFi / mobile data / Bluetooth settings. Use ONLY when the user asks to change a phone setting. command = user words, e.g. DND on karo, wifi kholo.","parameters":{"type":"OBJECT","properties":{"command":{"type":"STRING","description":"user request in plain words"}},"required":["command"]}},
+     {"name":"agent_task","description":"Track a multi-step phone task. action=begin with goal to make a plan; action=status to see progress; action=cancel to stop. Use other tools to actually act on screen; call status after each step.","parameters":{"type":"OBJECT","properties":{"action":{"type":"STRING","description":"begin, status or cancel"},"goal":{"type":"STRING","description":"task goal, needed for begin"}},"required":["action"]}},
      {"name":"get_weather","description":"Current weather + today/tomorrow forecast. place = city name; leave EMPTY for the weather where the user is right now.","parameters":{"type":"OBJECT","properties":{"place":{"type":"STRING"}}}},
      {"name":"open_google_search","description":"Show Google search RESULTS on the phone screen (only when the user wants to SEE the results; for answers use web_search).","parameters":{"type":"OBJECT","properties":{"query":{"type":"STRING"}},"required":["query"]}},
      {"name":"open_in_chrome","description":"Open Chrome and search Google for a query, or open a website. ALWAYS use this when the user says Chrome / browser / Google mein search karo / website kholo - never type with do_steps.","parameters":{"type":"OBJECT","properties":{"query":{"type":"STRING","description":"search words or a website like youtube.com"}},"required":["query"]}},
@@ -444,6 +445,7 @@ class GeminiLive(
                         "web_search" -> bg("Web search", 12000) { PhoneTools.webSearch(ctx, a.optString("query")) }
                         "open_in_chrome" -> PhoneTools.openInBrowser(ctx, a.optString("query"))
                         "quick_settings" -> QuickSettings.run(ctx, a.optString("command"))
+                        "agent_task" -> AgentTool.run(a.optString("action", "status"), a.optString("goal"))
                         "get_weather" -> PhoneTools.weather(ctx, a.optString("place"))
                         "open_google_search" -> PhoneTools.openGoogle(ctx, a.optString("query"))
                         "where_am_i" -> PhoneTools.whereAmI(ctx, a.optBoolean("show_map", false))

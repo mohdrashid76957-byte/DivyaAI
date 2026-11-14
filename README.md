@@ -580,3 +580,9 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Settings mein "Divya Core live wallpaper set karo" button se system ka live wallpaper chooser khulta hai. Wahan "Divya Core" chuno.
 - Video `assets/wallpaper/divya_core_wallpaper.mp4` mein hai (1080x1920). Screen band ho to playback pause hota hai.
 - Version 3.15 (versionCode 84). Compile/test nahi hua.
+
+## v3.16 - Agent engine ko Gemini tool se jodna
+- Naya tool `agent_task`: action "begin" (goal ke saath plan banta hai), "status" (progress: current step, done/baaki, last action verified ya nahi), "cancel" (task rokta hai).
+- Screen par actions ab bhi tap_text, type_text, do_steps jaise purane tools se hote hain. Ye tool sirf plan aur progress sambhalta hai.
+- Full auto verification loop (screen check ke saath) abhi nahi jud paaya hai.
+- Version 3.16 (versionCode 85). Compile/test nahi hua.
