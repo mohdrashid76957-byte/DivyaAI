@@ -586,3 +586,8 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Screen par actions ab bhi tap_text, type_text, do_steps jaise purane tools se hote hain. Ye tool sirf plan aur progress sambhalta hai.
 - Full auto verification loop (screen check ke saath) abhi nahi jud paaya hai.
 - Version 3.16 (versionCode 85). Compile/test nahi hua.
+
+## v3.17 - Divya Core button fix
+- "Divya Core live wallpaper set karo" ab seedha Divya Core ki preview kholta hai (ACTION_CHANGE_LIVE_WALLPAPER). Ye fail ho to system chooser khulta hai.
+- Video player ke errors logcat mein "DivyaCore" tag par aate hain.
+- Version 3.17 (versionCode 86). Compile/test nahi hua.
