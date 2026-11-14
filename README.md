@@ -556,3 +556,10 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - **Voice reply:** Divya ab awaaz mein list ya bullets nahi bolegi, seedhi baatcheet wali lines mein jawab dega.
 - **Bheed mein sunna:** agar Divya aapki baat nahi sun paati, to Settings > Voice Guardian mein Listen mode "Everyone" rakhein (Owner only mode shor mein aapko match nahi kar paata).
 - Version 3.11 (versionCode 80). Compile/test nahi hua.
+
+## v3.12 - Do Not Disturb aur internet panel voice se
+- "DND on karo" / "do not disturb band karo": Do Not Disturb chalu/band. Pehli baar Settings mein "Notification access" Divya ko dena hoga.
+- "wifi kholo" / "mobile data" / "internet": Android 10 ke baad WiFi seedha band nahi hota, isliye internet panel khulta hai.
+- "bluetooth kholo": Bluetooth settings khulti hain.
+- Alarm, timer, reminder aur brightness pehle se hain, unhe dobara nahi jodha.
+- Version 3.12 (versionCode 81). Compile/test nahi hua.
