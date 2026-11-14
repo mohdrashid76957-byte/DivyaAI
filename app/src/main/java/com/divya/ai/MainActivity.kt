@@ -396,7 +396,7 @@ fun DivyaApp(ctx: Context) {
             }
         }
     }
-    if (glowOn) GlowBorder(if (micNow) Color(0xFF00FF40) else th.accent, micNow)
+    if (glowOn) ScreenLineAuto(if (micNow) Color(0xFF00FF40) else th.accent, micNow)
     BgOverlay()
     // Live screen sharing ka chhota button (session chalu hone par dikhta hai). ON hone par Divya aapki screen dekhti rehti hai.
     if (live.running && screen != Screen.Scan && screen != Screen.Chat && screen != Screen.ProChat) {
@@ -664,6 +664,10 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
         }
     }
     Text("Ring ke liye Accessibility ya 'Display over other apps' permission ON honi chahiye.", color = th.text.copy(alpha = 0.6f), fontSize = 11.sp)
+    var lineSt by remember { mutableStateOf(prefs.getString("lineStyle", "glow") ?: "glow") }
+    Btn(th, "Line style: " + lineStyleLabel(lineSt)) { lineSt = nextLineStyle(lineSt); prefs.edit().putString("lineStyle", lineSt).apply() }
+    var linePs by remember { mutableStateOf(prefs.getString("linePos", "all") ?: "all") }
+    Btn(th, "Line jagah: " + linePosLabel(linePs)) { linePs = nextLinePos(linePs); prefs.edit().putString("linePos", linePs).apply() }
     var fl by remember { mutableStateOf(prefs.getBoolean("float", false)) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("Floating Divya (home/apps ke upar avatar)", color = th.text, modifier = Modifier.weight(1f))

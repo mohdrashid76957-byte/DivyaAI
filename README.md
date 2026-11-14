@@ -563,3 +563,9 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - "bluetooth kholo": Bluetooth settings khulti hain.
 - Alarm, timer, reminder aur brightness pehle se hain, unhe dobara nahi jodha.
 - Version 3.12 (versionCode 81). Compile/test nahi hua.
+
+## v3.13 - Screen ki line: chalti line, 2D Zine, aur jagah ka chunav
+- Settings mein "Line style" tap karke chuno: Glow (purana), 2D Zine (flat moti line + shadow), ya Chalti line (chamakti line jo screen ke edges par ghoomti hai).
+- Settings mein "Line jagah" tap karke chuno: Chaaron taraf, Dono side, Upar, ya Neeche.
+- Naya style lagane ke liye app dobara kholna padega.
+- Version 3.13 (versionCode 82). Compile/test nahi hua.
