@@ -614,3 +614,10 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Owner-only / Owner+Family mode mein anjaan awaaz ab Gemini tak nahi jaati. Pehle ek tolerance ki wajah se doosre logon ki baat bhi chal jaati thi, aur chhoti awaaz ko bhi pass kar diya jata tha.
 - Log tag "DivyaGuard" par role aur score dikhte hain, agar ab bhi galat awaaz pass ho to wo log bhejo.
 - Version 3.21 (versionCode 90). Compile/test nahi hua.
+
+## v3.22 - Love & Emotions
+- Divya ab pyaar, muskaan, hansi, rona, flying kiss aur dard (hurt) dikhati hai: tool `show_emotion` + screen animation (`Emotions.kt`: aansoo girte hain, dil/kiss ud kar aate hain).
+- Aap ko chot/dard/udaasi ho to wo bhi dukhi hoti hai (rone jaisi awaaz) aur sambhalti hai.
+- SPEED rule: phone task par pehle tool call, phir 6 shabd ya kam mein confirm (1 sec ki guarantee nahi, net/AI latency par depend).
+- Jaanbujh kar NAHI: doosri ladki se baat par rona/jealousy/guilt-trip (prompt mein possessive na hone ka rule hai). Wo sirf supportive rehti hai.
+- Compile/test nahi hua.

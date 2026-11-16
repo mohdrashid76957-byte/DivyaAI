@@ -218,7 +218,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 var unlocked by remember { mutableStateOf(LicenseGate.isActive(this)) }
-                if (unlocked) { DivyaApp(this); CreatorCard() }
+                if (unlocked) Box(Modifier.fillMaxSize()) { DivyaApp(this@MainActivity); CreatorCard(); EmotionOverlay() }
                 else Box(Modifier.fillMaxSize().background(Color(0xFF020611))) {
                     LicenseScreen {
                         unlocked = true
