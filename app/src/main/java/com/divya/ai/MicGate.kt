@@ -101,17 +101,17 @@ class MicGate(private val ctx: Context) {
         for (h in recheck) { System.arraycopy(h, 0, pcm, o, h.size); o += h.size }
         val p = ctx.getSharedPreferences("divya", 0)
         val sp = VoiceGuardian.identifyRaw(p, pcm)
-        if (sp.role == "unverified") return true
+        // v3.21: chhoti / saaf nahi wali awaaz bhi chalu segment mein pass nahi hogi (pehle yahan true tha)
+        if (sp.role == "unverified") return false
         VoiceGuardian.last = sp
         val mode = p.getInt("vgMode", 1)
         return when (sp.role) {
             "owner" -> { VoiceGuardian.lastOwnerAt = System.currentTimeMillis(); true }
             "family" -> mode == 2
             else -> {
-                // thoda hysteresis: owner ki khansi/shor se ek baar score thoda upar jaye to na kato; saaf alag awaaz par kato
-                val bad = sp.limit > 0 && sp.score / sp.limit > 1.15
-                if (bad) VoiceGuardian.blockedHeard(ctx, sp)
-                !bad
+                // v3.21: anjaan awaaz ko koi tolerance nahi. Pehle 1.15x hysteresis se doosre log bhi nikal jaate the.
+                VoiceGuardian.blockedHeard(ctx, sp)
+                false
             }
         }
     }

@@ -609,3 +609,8 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Install aap khud karte ho. App koi APK silently install nahi karti.
 - Naya version tabhi mana jayega jab GitHub par release (tag jaise v3.21) aur usme .apk file ho.
 - Version 3.20 (versionCode 89). Compile/test nahi hua.
+
+## v3.21 - Voice Guardian bug fix (doosron ki awaaz)
+- Owner-only / Owner+Family mode mein anjaan awaaz ab Gemini tak nahi jaati. Pehle ek tolerance ki wajah se doosre logon ki baat bhi chal jaati thi, aur chhoti awaaz ko bhi pass kar diya jata tha.
+- Log tag "DivyaGuard" par role aur score dikhte hain, agar ab bhi galat awaaz pass ho to wo log bhejo.
+- Version 3.21 (versionCode 90). Compile/test nahi hua.
