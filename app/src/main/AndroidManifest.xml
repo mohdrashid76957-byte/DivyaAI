@@ -74,6 +74,8 @@
             <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
             <meta-data android:name="android.service.wallpaper" android:resource="@xml/wallpaper" />
         </service>
+        <!-- v3.19: mini-app sandbox -->
+        <activity android:name=".MiniAppActivity" android:exported="false" android:label="Mini app" />
         <receiver android:name=".SchedReceiver" android:exported="false" />
         <receiver android:name=".TermuxResultReceiver" android:exported="false" />
         <receiver android:name=".BootReceiver" android:exported="true">

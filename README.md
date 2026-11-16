@@ -596,3 +596,9 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Debug build mein unused code aur resources hatde hain, isliye APK kaafi chhota hoga. APK ka path aur install process same hai.
 - Agar install ke baad koi feature crash ho (voice, accessibility, wallpaper) to bata dena, keep rules mein add karenge.
 - Version 3.18 (versionCode 87). Compile/test nahi hua.
+
+## v3.19 - Mini-apps (sandbox)
+- Divya bolne par chhota HTML app banati hai (calendar, notes, timer, calculator...) aur turant khol deti hai.
+- Tools: create_mini_app (naya ya update), open_mini_app (naam se kholna), list_mini_apps.
+- Sandbox: mini-app ko internet, phone files ya phone control nahi milta. Sirf wahi HTML/JS chalta hai.
+- Apps phone mein save rehte hain. Version 3.19 (versionCode 88). Compile/test nahi hua.

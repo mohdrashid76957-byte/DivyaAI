@@ -2,7 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "com.divya.ai"
     compileSdk = 34
-    defaultConfig { applicationId = "com.divya.ai"; minSdk = 26; targetSdk = 34; versionCode = 87; versionName = "3.18" }
+    defaultConfig { applicationId = "com.divya.ai"; minSdk = 26; targetSdk = 34; versionCode = 88; versionName = "3.19" }
     signingConfigs {
         getByName("debug") {
             if (file("divya.keystore").exists()) {
