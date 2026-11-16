@@ -621,3 +621,8 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - SPEED rule: phone task par pehle tool call, phir 6 shabd ya kam mein confirm (1 sec ki guarantee nahi, net/AI latency par depend).
 - Jaanbujh kar NAHI: doosri ladki se baat par rona/jealousy/guilt-trip (prompt mein possessive na hone ka rule hai). Wo sirf supportive rehti hai.
 - Compile/test nahi hua.
+
+## v3.23 - Game Coach (fair play)
+- Bolo "game coach" / "Free Fire coach" / "mera match dekho": Divya coach ban kar sensitivity, HUD, crosshair, Training Ground drills, match review (match ke BAAD) aur hausla deti hai.
+- Limit: game ko khud control nahi karti, aimbot/live enemy location/hack nahi (ID ban ka khatra).
+- Prompt only (GeminiLive.kt), compile risk kam. Test nahi hua.
