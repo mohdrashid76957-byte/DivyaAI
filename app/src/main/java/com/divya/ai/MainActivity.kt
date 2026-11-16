@@ -723,6 +723,11 @@ fun SettingsScreen(th: UiTheme, prefs: android.content.SharedPreferences, themeI
     }
     Btn(th, "🎭 Toy avatar chuno") { sctx.startActivity(android.content.Intent(sctx, OverlayToysActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
     Btn(th, "🖼 Divya Core live wallpaper set karo") { openDivyaCore(sctx) }
+    var upd by remember { mutableStateOf(prefs.getString("updateUrl", "") ?: "") }
+    OutlinedTextField(upd, { upd = it; prefs.edit().putString("updateUrl", it.trim()).apply() }, Modifier.fillMaxWidth(),
+        label = { Text("Update URL (GitHub release API link, https://api.github.com/repos/USER/REPO/releases/latest)") }, singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = th.text, unfocusedTextColor = th.text))
+    Btn(th, "Update check karo") { AppUpdate.checkAsync(sctx) }
     var nu by remember { mutableStateOf(prefs.getBoolean("needUnlock", true)) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("Safety: phone locked ho to Divya koi kaam na kare (sirf aap unlock karke chalao)", color = th.text, modifier = Modifier.weight(1f))

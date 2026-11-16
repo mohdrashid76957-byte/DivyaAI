@@ -602,3 +602,10 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Tools: create_mini_app (naya ya update), open_mini_app (naam se kholna), list_mini_apps.
 - Sandbox: mini-app ko internet, phone files ya phone control nahi milta. Sirf wahi HTML/JS chalta hai.
 - Apps phone mein save rehte hain. Version 3.19 (versionCode 88). Compile/test nahi hua.
+
+## v3.20 - Safe update check
+- Settings mein "Update URL" field mein apne GitHub release ka API link daalo, jaise https://api.github.com/repos/USER/REPO/releases/latest
+- "Update check karo" button naya version dhoondhta hai. Naya version mile to APK ka download link browser mein khulta hai.
+- Install aap khud karte ho. App koi APK silently install nahi karti.
+- Naya version tabhi mana jayega jab GitHub par release (tag jaise v3.21) aur usme .apk file ho.
+- Version 3.20 (versionCode 89). Compile/test nahi hua.
