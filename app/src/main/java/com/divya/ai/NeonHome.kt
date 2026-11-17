@@ -223,45 +223,62 @@ fun AboutScreen(th: UiTheme) {
 }
 
 
-/** Avatar: Divya bolti hai to uski asli awaaz ki loudness se hilta, chamakta aur halka sir hilata hai. */
+/**
+ * Avatar (v3.25 Talking Animation): Divya ki asli awaaz se mooh hilta hai (TalkingMouth), bolte waqt sir/body halka hilti hai (nod, sway, emphasis),
+ * sunte waqt aage jhuk kar sir tirchha, sochte waqt sir tirchha + idhar-udhar nazar, warna saans lena + halka sway (idle). Sab graphicsLayer par = halka, crash-safe.
+ * Note: ye ek photo par 2D animation hai; haath/palken asli rig ke bina nahi hilte (README dekho).
+ */
 @Composable
 fun AvatarHero(img: Int, faces: IntArray?, accent: Color, modifier: Modifier, custom: androidx.compose.ui.graphics.ImageBitmap? = null) {
     val tr = rememberInfiniteTransition(label = "av")
-    val f by tr.animateFloat(-1f, 1f, infiniteRepeatable(tween(2800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "f")
+    val breath by tr.animateFloat(-1f, 1f, infiniteRepeatable(tween(3200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "br")
+    val sway by tr.animateFloat(-1f, 1f, infiniteRepeatable(tween(5200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "sw")
+    val glance by tr.animateFloat(-1f, 1f, infiniteRepeatable(tween(2400, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "gl")
+    val phase by tr.animateFloat(0f, 6.2831855f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "ph")
     val stage = AvatarBus.stage
-    val smooth by animateFloatAsState(AvatarBus.level, tween(90), label = "lv")
+    val smooth by animateFloatAsState(AvatarBus.level, tween(70), label = "lv")
     val speaking = smooth > 0.02f
+    val motion: androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit = {
+        val lv = smooth
+        val spk = AvatarBus.speaking || lv > 0.02f
+        val st = AvatarBus.stage
+        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.8f)
+        var ty = breath * 2.dp.toPx(); var tx = sway * 3.dp.toPx(); var rz = sway * 0.6f; var sc = 1f + 0.006f * breath
+        if (spk) {
+            ty -= lv * 5.dp.toPx()
+            rz += kotlin.math.sin(phase) * 1.5f * (0.4f + lv) + kotlin.math.sin(phase * 0.5f) * 0.8f
+            tx += kotlin.math.sin(phase * 0.5f) * 3.dp.toPx() * lv
+            sc += 0.022f * lv
+        } else if (st == 1 || st == 2) { rz += -2.5f; sc += 0.015f; ty -= 3.dp.toPx() }
+        else if (st == 3 || st == 4) { rz += 2.2f + glance * 1.2f; tx += glance * 5.dp.toPx() }
+        translationX = tx; translationY = ty; rotationZ = rz; scaleX = sc; scaleY = sc
+    }
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val r = size.minDimension * (0.40f + 0.12f * smooth)
             drawCircle(accent.copy(alpha = (0.06f + 0.30f * smooth).coerceIn(0f, 1f)), radius = r * 1.15f, center = center)
             drawCircle(accent.copy(alpha = (0.10f + 0.40f * smooth).coerceIn(0f, 1f)), radius = r, center = center, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()))
         }
-        // Chehra halat ke hisaab se: bolte waqt mukhya photo, sunte waqt listening, soch/kaam mein thinking, kaam poora to happy
+        // Chehra halat ke hisaab se: khushi/hansi/pyaar ho to happy, warna bolte waqt mukhya photo, sunte waqt listening, soch/kaam mein thinking, kaam poora to happy
+        val happyNow = EmotionBus.kind in listOf("smile", "laugh", "love", "kiss")
         val shown = when {
-            faces == null || AvatarBus.speaking -> img
+            faces == null -> img
+            happyNow -> faces[2]
+            AvatarBus.speaking -> img
             stage == 5 -> faces[2]
             stage == 3 || stage == 4 -> faces[1]
             stage == 1 || stage == 2 -> faces[0]
             else -> img
         }
         if (custom != null) {
-            // User ka chuna hua outfit: is case mein lip-sync wali asli drawables ki jagah yahi image dikhti hai
-            Image(custom, "Divya", Modifier.fillMaxSize().graphicsLayer {
-                translationY = f * 5.dp.toPx() * (if (stage > 0) 1.6f else 1f)
-                val sc = 1f + 0.02f * smooth
-                scaleX = sc; scaleY = sc
-            }, contentScale = ContentScale.Fit)
+            // User ka chuna hua outfit: is case mein asli drawables ki jagah yahi image dikhti hai
+            Image(custom, "Divya", Modifier.fillMaxSize().graphicsLayer { motion() }, contentScale = ContentScale.Fit)
         } else androidx.compose.animation.Crossfade(shown, animationSpec = tween(220), label = "expr") { res ->
-            val mod = Modifier.fillMaxSize().graphicsLayer {
-                translationY = f * 5.dp.toPx() * (if (stage > 0) 1.6f else 1f)
-                val sc = 1f + 0.02f * smooth
-                scaleX = sc; scaleY = sc
-                rotationZ = f * (if (speaking) 1.2f else 0.5f)
+            val lip = if (res == img) lipCfgFor(res) else null
+            Box(Modifier.fillMaxSize().graphicsLayer { motion() }) {
+                Image(painterResource(res), "Divya", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                if (lip != null && (speaking || AvatarBus.speaking)) TalkingMouth(res, lip, smooth, AvatarBus.shape, Modifier.fillMaxSize())
             }
-            val lip = if (LIP_SYNC_ENABLED && res == img) lipCfgFor(res) else null
-            if (lip != null) LipSyncImage(res, lip, smooth, if (speaking) AvatarBus.shape else 0f, mod)   // mooh awaaz ke saath hilta hai
-            else Image(painterResource(res), "Divya", mod, contentScale = ContentScale.Fit)
         }
     }
 }

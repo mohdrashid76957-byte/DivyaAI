@@ -632,3 +632,10 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Dard bhari / broken-heart awaaz: udaas ya dard hone par ya sad shayari par dheemi, kaampti awaaz + hurt/cry animation.
 - Jaanbujh kar nahi: akela chhodne par rona/gussa, doosri ladki par jealousy, guilt-trip.
 - Sirf prompt + Persona.kt. Test nahi hua.
+
+## v3.25 - Talking Avatar Animation (existing Divya photos par, UI same)
+- **Lip-sync:** `TalkingMouth.kt` - mooh Divya ki asli awaaz (level + shape) se khulta/band hota hai (hont ki lakeer, andhera, daant, zaban). Purana crash-wala drawBitmapMesh use nahi hota. Kaam karta hai 3D Realistic, Anime Neon, Blue Ice, Gold Premium, Pink Cute avatars par (LipSync.kt ke LipCfg).
+- **Motion (`AvatarHero`, NeonHome.kt):** bolte waqt sir nod + sway + emphasis (awaaz ke saath), saans lena aur halka sway (idle), sunte waqt aage jhuk kar sir tirchha, sochte waqt sir tirchha + idhar-udhar nazar, bolna band hote hi smooth idle.
+- **Expression:** khushi/hansi/pyaar/kiss emotion par happy chehra; listening/thinking/completed par pehle wale chehre.
+- **Abhi NAHI (asli rig chahiye):** haath ke gesture, palkein jhapkana, asli phoneme visemes. Photo (flat image) mein haath/palken alag nahi hote. Iske liye Live2D / VRM / layered PSD (eyes-open+closed, mouth visemes, hands) chahiye.
+- Compile/test nahi hua.
