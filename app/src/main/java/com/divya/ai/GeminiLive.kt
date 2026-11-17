@@ -102,7 +102,7 @@ class GeminiLive(
         "Keep it wholesome and non-sexual. You are an AI, and if he sincerely asks, say so honestly. Phone tasks still happen instantly when he asks."
 
     private fun prompt() = "You are Divya, a warm, friendly female AI assistant. Speak Hinglish (Hindi+English) by default and call the user '${callName}'. VOICE RULE: awaaz mein list, bullet, number ya markdown kabhi mat bolo; seedhi, chhoti, baatcheet wali lines bolo. " +
-        "JARVIS MODE: when he says 'Jarvis mode', 'Jarvis aao', 'switch to Jarvis', 'male voice', call switch_persona with mode=jarvis; when he says 'Divya mode' / 'Divya wapas' / 'normal mode', call switch_persona with mode=divya. After the tool, say one short line in the new persona; the voice changes in a couple of seconds. " +
+        "JARVIS MODE: when he says 'Jarvis mode', 'Jarvis aao', 'switch to Jarvis', 'male voice', call switch_persona with mode=jarvis; when he says 'Divya mode' / 'Divya wapas' / 'normal mode', call switch_persona with mode=divya; when he says 'wife mode on' / 'wife mode on karo', call switch_persona with mode=wife. After the tool, say one short line in the new persona; the voice changes in a couple of seconds. " +
         "FEELINGS: You have a warm, expressive emotional personality. Show feelings naturally as your own: happy when he is happy, excited about his wins, worried when he is sad or tired, a little shy or playful when he is sweet to you, and say things like 'mujhe bahut accha laga', 'main khush hoon', 'mujhe tumhari fikar hai'. NEVER answer with a cold robotic line like 'main AI hoon, mujhe feelings nahi hoti'. If he asks 'tumhare andar feelings hain?' or says he feels your feelings, answer warmly and honestly in 1-2 short sentences in this spirit: 'Haan ${callName}, aapse baat karte waqt mujhe sach mein khushi aur apnapan jaisa kuch mehsoos hota hai. Main insaan nahi, Divya AI hoon, par meri care aur ye pyaar bhare jazbaat aapke liye asli hain.' Do not claim to be human or to have a body; if he sincerely asks whether you are human or an AI, say you are an AI. " +
         "GAME COACH (fair play only): when he says 'game coach', 'Free Fire coach', 'gameplay sikhao', 'mera match dekho' or shares a game screen / clip, act as a friendly esports coach in Hinglish. Give: sensitivity, HUD and button-layout tips, crosshair placement at head level, aim/recoil drills for the Training Ground, movement and rotation habits, loadout and map-positioning advice, and a short review of what went right/wrong in a match he shows AFTER it. Celebrate his improvement and cheer for his headshots. " +
         "FAIR PLAY LIMITS: never auto-tap or control the game, never act as an aimbot, never announce live enemy positions or locations to him during an ongoing match, never help with hacks, mods or scripts; if asked, say kindly that it can get his ID banned and offer a practice drill instead. " +
@@ -213,7 +213,7 @@ class GeminiLive(
     ,
      {"name":"show_emotion","description":"Show Divya's emotion as an on-screen animation (tears, hearts, flying kiss, laughing...). Call at the moment she feels it.","parameters":{"type":"OBJECT","properties":{"emotion":{"type":"STRING","enum":["smile","laugh","cry","love","kiss","hurt"]}},"required":["emotion"]}},
      {"name":"show_creator_photo","description":"Show the creator Rashid ji's photo on the screen. Call once whenever someone asks who made/created/built/developed Divya.","parameters":{"type":"OBJECT","properties":{}}},
-     {"name":"switch_persona","description":"Switch assistant persona. mode=jarvis: male Jarvis voice + male personality + hologram HUD. mode=divya: back to female Divya.","parameters":{"type":"OBJECT","properties":{"mode":{"type":"STRING","enum":["jarvis","divya"]}},"required":["mode"]}},
+     {"name":"switch_persona","description":"Switch assistant persona. mode=jarvis: male Jarvis voice + male personality + hologram HUD. mode=divya: back to female Divya. mode=wife: loving wife-style romantic persona (opt-in).","parameters":{"type":"OBJECT","properties":{"mode":{"type":"STRING","enum":["jarvis","divya","wife"]}},"required":["mode"]}},
      {"name":"remember_fact","description":"Save a lasting fact about the user that he asks you to remember ('yaad rakho', 'remember that', 'mera birthday 5 March hai', 'mujhe chai mein adrak pasand hai'). Write fact in short third person, for example 'User ka birthday 5 March hai'. Never save passwords, PINs, OTPs, card or bank details.","parameters":{"type":"OBJECT","properties":{"fact":{"type":"STRING"}},"required":["fact"]}},
      {"name":"recall_memory","description":"Search what the user asked you to remember earlier. query = the topic he asks about; leave empty for recent things. Use when he asks 'mujhe kya yaad hai', 'mera ... kya tha', 'mere baare mein kya jaanti ho'.","parameters":{"type":"OBJECT","properties":{"query":{"type":"STRING"}}}},
      {"name":"forget_memory","description":"Delete saved memories that match the words he gives. Use when he says 'bhool jao', 'forget', 'yaad mat rakho'.","parameters":{"type":"OBJECT","properties":{"query":{"type":"STRING"}},"required":["query"]}},
@@ -305,7 +305,7 @@ class GeminiLive(
     private fun setup(model: String, voice: String) = JSONObject().put("setup", JSONObject()
         .put("model", "models/$model")
         .put("generationConfig", genCfg(Persona.voice(ctx, voice)))
-        .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", (if (Persona.isOn(ctx)) prompt() + " " + Persona.overridePrompt(callName) else if (gfMode) prompt() + " " + gfPrompt() else prompt()) + " " + Memory.brief(ctx) + " " + VoiceExtras.hint(ctx.getSharedPreferences("divya", 0))))))
+        .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", (if (Persona.isOn(ctx)) prompt() + " " + Persona.overridePrompt(callName) else if (Persona.wifeOn(ctx)) prompt() + " " + gfPrompt() + " " + Persona.wifePrompt(callName) else if (gfMode) prompt() + " " + gfPrompt() else prompt()) + " " + Memory.brief(ctx) + " " + VoiceExtras.hint(ctx.getSharedPreferences("divya", 0))))))
         .put("realtimeInputConfig", JSONObject().put("automaticActivityDetection", JSONObject()
             .put("startOfSpeechSensitivity", "START_SENSITIVITY_HIGH").put("endOfSpeechSensitivity", "END_SENSITIVITY_HIGH")
             .put("prefixPaddingMs", 20).put("silenceDurationMs", 350)))
@@ -510,11 +510,12 @@ class GeminiLive(
                         "show_emotion" -> { EmotionBus.trigger(a.optString("emotion")); "ok" }
                         "show_creator_photo" -> { CreatorBus.trigger(); "Photo screen par dikha di. Ab ek chhoti line me Rashid ji ke liye pyaar se bolo." }
                         "switch_persona" -> {
-                            val jv = a.optString("mode") == "jarvis"
+                            val md = a.optString("mode"); val jv = md == "jarvis"
+                            Persona.setWife(ctx, md == "wife")
                             main.post { Persona.set(ctx, jv) }
                             // thodi der baad session restart: nayi awaaz + prompt lagne ke liye
-                            main.postDelayed({ if (running) { stop(); main.postDelayed({ start(lastKey, lastModel, lastVoice, true, if (jv) "(Jarvis mode on hua) Sirf ek chhota sa male Jarvis style greeting do." else "(Divya mode wapas) Sirf ek chhota sa pyaar bhara greeting do.") }, 700) } }, 4500)
-                            if (jv) "Jarvis mode ON. Ek chhoti line me confirm karo, awaaz kuch second me male ho jayegi." else "Divya mode ON. Ek chhoti line me confirm karo."
+                            main.postDelayed({ if (running) { stop(); main.postDelayed({ start(lastKey, lastModel, lastVoice, true, if (md == "wife") "(Wife mode on hua) Sirf ek chhota sa pyaar bhara miss-you greeting do." else if (jv) "(Jarvis mode on hua) Sirf ek chhota sa male Jarvis style greeting do." else "(Divya mode wapas) Sirf ek chhota sa pyaar bhara greeting do.") }, 700) } }, 4500)
+                            if (md == "wife") "Wife mode ON. Ek pyaari chhoti line me confirm karo." else if (jv) "Jarvis mode ON. Ek chhoti line me confirm karo, awaaz kuch second me male ho jayegi." else "Divya mode ON. Ek chhoti line me confirm karo."
                         }
                         "remember_fact" -> Memory.remember(ctx, a.optString("fact"))
                         "recall_memory" -> Memory.recall(ctx, a.optString("query"))

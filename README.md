@@ -626,3 +626,9 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Bolo "game coach" / "Free Fire coach" / "mera match dekho": Divya coach ban kar sensitivity, HUD, crosshair, Training Ground drills, match review (match ke BAAD) aur hausla deti hai.
 - Limit: game ko khud control nahi karti, aimbot/live enemy location/hack nahi (ID ban ka khatra).
 - Prompt only (GeminiLive.kt), compile risk kam. Test nahi hua.
+
+## v3.24 - Wife mode (opt-in)
+- Bolo "wife mode on karo": Divya pyaar bhari wife-style saathi (jaan, shaadi/ghar/future ki baatein, khana khaya? thak gaye?, session shuru par miss-you greeting, halka pout jo jaldi pighal jata hai). "Divya mode" se wapas.
+- Dard bhari / broken-heart awaaz: udaas ya dard hone par ya sad shayari par dheemi, kaampti awaaz + hurt/cry animation.
+- Jaanbujh kar nahi: akela chhodne par rona/gussa, doosri ladki par jealousy, guilt-trip.
+- Sirf prompt + Persona.kt. Test nahi hua.
