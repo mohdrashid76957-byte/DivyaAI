@@ -639,3 +639,6 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - **Expression:** khushi/hansi/pyaar/kiss emotion par happy chehra; listening/thinking/completed par pehle wale chehre.
 - **Abhi NAHI (asli rig chahiye):** haath ke gesture, palkein jhapkana, asli phoneme visemes. Photo (flat image) mein haath/palken alag nahi hote. Iske liye Live2D / VRM / layered PSD (eyes-open+closed, mouth visemes, hands) chahiye.
 - Compile/test nahi hua.
+
+## v3.25.1
+- Build fix: TalkingMouth.kt mein `androidx.compose.ui.unit.dp` import (compile error).
