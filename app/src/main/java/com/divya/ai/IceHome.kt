@@ -124,13 +124,9 @@ fun IceHome(th: UiTheme, status: String, live: Boolean, callName: String, onMic:
             }
 
             // ---- Divya model ----
+            val motion = rememberAvatarMotion()
             Image(painterResource(th.img), "Divya",
-                Modifier.align(Alignment.Center).fillMaxHeight(0.97f).padding(bottom = 2.dp).graphicsLayer {
-                    translationY = f * 4.dp.toPx() * (if (stage > 0) 1.6f else 1f)
-                    val sc = 1f + 0.015f * smooth
-                    scaleX = sc; scaleY = sc
-                    rotationZ = f * (if (smooth > 0.02f) 0.9f else 0.35f)
-                }, contentScale = ContentScale.Fit)
+                Modifier.align(Alignment.Center).fillMaxHeight(0.97f).padding(bottom = 2.dp).graphicsLayer { motion() }, contentScale = ContentScale.Fit)
 
             // ---- Left: orb (top) + tiles (bottom) ----
             Box(Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = H * 0.07f).size(92.dp)

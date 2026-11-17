@@ -199,11 +199,9 @@ fun CyberHome(th: UiTheme, status: String, live: Boolean, callName: String, onMi
             }
 
             // ---- Divya model ----
+            val motion = rememberAvatarMotion()
             Image(painterResource(th.img), "Divya",
-                Modifier.align(Alignment.TopCenter).padding(top = H * 0.10f).height(H * 0.66f).graphicsLayer {
-                    translationY = f * 3.dp.toPx()
-                    val sc = 1f + 0.015f * smooth; scaleX = sc; scaleY = sc
-                }, contentScale = ContentScale.Fit)
+                Modifier.align(Alignment.TopCenter).padding(top = H * 0.10f).height(H * 0.66f).graphicsLayer { motion() }, contentScale = ContentScale.Fit)
 
             // ---- speech bubble ----
             val hello = buildAnnotatedString {

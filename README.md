@@ -642,3 +642,6 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 
 ## v3.25.1
 - Build fix: TalkingMouth.kt mein `androidx.compose.ui.unit.dp` import (compile error).
+
+## v3.26
+- Talking motion ab Ice/Cyber home layouts par bhi (AvatarMotion.kt): pehle sirf Neon layout par thi. Neon/AvatarHero par lip-sync mouth wali 5 avatars par bhi.
