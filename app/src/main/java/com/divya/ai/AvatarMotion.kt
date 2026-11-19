@@ -21,18 +21,21 @@ fun rememberAvatarMotion(): GraphicsLayerScope.() -> Unit {
     val phase by tr.animateFloat(0f, 6.2831855f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "ph")
     val smooth by animateFloatAsState(AvatarBus.level, tween(70), label = "lv")
     return {
-        val lv = smooth
-        val spk = AvatarBus.speaking || lv > 0.02f
+        val spk = AvatarBus.speaking || smooth > 0.02f
+        // bolte waqt awaaz halki ho tab bhi jeevant dikhe: asli loudness + chalta hua natural envelope
+        val lv = if (spk) maxOf(smooth, 0.40f + 0.30f * sin(phase * 2.3f) * sin(phase * 0.7f + 1f)).coerceIn(0f, 1f) else 0f
         val st = AvatarBus.stage
         transformOrigin = TransformOrigin(0.5f, 0.8f)
-        var ty = breath * 2.dp.toPx(); var tx = sway * 3.dp.toPx(); var rz = sway * 0.6f; var sc = 1f + 0.006f * breath
+        cameraDistance = 14f * density
+        var ty = breath * 5.dp.toPx(); var tx = sway * 8.dp.toPx(); var rz = sway * 1.2f; var sc = 1f + 0.012f * breath; var ry = sway * 2f
         if (spk) {
-            ty -= lv * 5.dp.toPx()
-            rz += sin(phase) * 1.5f * (0.4f + lv) + sin(phase * 0.5f) * 0.8f
-            tx += sin(phase * 0.5f) * 3.dp.toPx() * lv
-            sc += 0.022f * lv
-        } else if (st == 1 || st == 2) { rz += -2.5f; sc += 0.015f; ty -= 3.dp.toPx() }
-        else if (st == 3 || st == 4) { rz += 2.2f + glance * 1.2f; tx += glance * 5.dp.toPx() }
-        translationX = tx; translationY = ty; rotationZ = rz; scaleX = sc; scaleY = sc
+            ty -= lv * 9.dp.toPx() * (0.6f + 0.4f * sin(phase * 2f))
+            rz += sin(phase) * 3.5f * (0.5f + lv) + sin(phase * 0.5f) * 1.6f
+            tx += sin(phase * 0.5f) * 7.dp.toPx()
+            ry += sin(phase * 0.5f + 0.8f) * 7f          // sir idhar-udhar ghoomta hai
+            sc += 0.035f * lv
+        } else if (st == 1 || st == 2) { rz += -4f; sc += 0.03f; ty -= 6.dp.toPx(); ry += 4f }          // sun rahi hai: aage jhuk kar sir tirchha
+        else if (st == 3 || st == 4) { rz += 4f + glance * 2f; tx += glance * 9.dp.toPx(); ry += glance * 8f } // soch rahi hai: nazar idhar-udhar
+        translationX = tx; translationY = ty; rotationZ = rz; rotationY = ry; scaleX = sc; scaleY = sc
     }
 }
