@@ -238,21 +238,7 @@ fun AvatarHero(img: Int, faces: IntArray?, accent: Color, modifier: Modifier, cu
     val stage = AvatarBus.stage
     val smooth by animateFloatAsState(AvatarBus.level, tween(70), label = "lv")
     val speaking = smooth > 0.02f
-    val motion: androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit = {
-        val lv = smooth
-        val spk = AvatarBus.speaking || lv > 0.02f
-        val st = AvatarBus.stage
-        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.8f)
-        var ty = breath * 2.dp.toPx(); var tx = sway * 3.dp.toPx(); var rz = sway * 0.6f; var sc = 1f + 0.006f * breath
-        if (spk) {
-            ty -= lv * 5.dp.toPx()
-            rz += kotlin.math.sin(phase) * 1.5f * (0.4f + lv) + kotlin.math.sin(phase * 0.5f) * 0.8f
-            tx += kotlin.math.sin(phase * 0.5f) * 3.dp.toPx() * lv
-            sc += 0.022f * lv
-        } else if (st == 1 || st == 2) { rz += -2.5f; sc += 0.015f; ty -= 3.dp.toPx() }
-        else if (st == 3 || st == 4) { rz += 2.2f + glance * 1.2f; tx += glance * 5.dp.toPx() }
-        translationX = tx; translationY = ty; rotationZ = rz; scaleX = sc; scaleY = sc
-    }
+    val motion = rememberAvatarMotion()
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val r = size.minDimension * (0.40f + 0.12f * smooth)
@@ -260,7 +246,7 @@ fun AvatarHero(img: Int, faces: IntArray?, accent: Color, modifier: Modifier, cu
             drawCircle(accent.copy(alpha = (0.10f + 0.40f * smooth).coerceIn(0f, 1f)), radius = r, center = center, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()))
         }
         // Chehra halat ke hisaab se: khushi/hansi/pyaar ho to happy, warna bolte waqt mukhya photo, sunte waqt listening, soch/kaam mein thinking, kaam poora to happy
-        val happyNow = EmotionBus.kind in listOf("smile", "laugh", "love", "kiss")
+        val happyNow = EmotionBus.kind in listOf("smile", "laugh", "love", "kiss", "blush", "proud", "hug")
         val shown = when {
             faces == null -> img
             happyNow -> faces[2]

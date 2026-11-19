@@ -37,14 +37,15 @@ fun EmotionOverlay() {
         prog.animateTo(1f, tween(3400, easing = LinearEasing))
         EmotionBus.kind = ""
     }
-    val main = when (k) { "cry" -> "😭"; "laugh" -> "😂"; "smile" -> "😊"; "love" -> "😍"; "kiss" -> "😘"; "hurt" -> "💔"; else -> "💜" }
+    val main = when (k) { "cry" -> "😭"; "laugh" -> "😂"; "smile" -> "😊"; "love" -> "😍"; "kiss" -> "😘"; "hurt" -> "💔"; "hug" -> "🤗"; "worry" -> "🥺"; "blush" -> "🥰"; "proud" -> "🌟"; else -> "💜" }
     val bits = when (k) {
         "cry" -> listOf("💧", "😢"); "hurt" -> listOf("💧", "🥺")
         "laugh" -> listOf("😆", "✨", "🤣"); "smile" -> listOf("✨", "🌸")
         "kiss" -> listOf("💋", "❤️", "😘"); "love" -> listOf("💖", "❤️", "💞")
+        "hug" -> listOf("💞", "🤍", "🤗"); "worry" -> listOf("💭", "💧"); "blush" -> listOf("💗", "🌸", "🥰"); "proud" -> listOf("✨", "👏", "🌟")
         else -> listOf("💜")
     }
-    val falling = k == "cry" || k == "hurt"
+    val falling = k == "cry" || k == "hurt" || k == "worry"
     val p = prog.value
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val W = maxWidth
