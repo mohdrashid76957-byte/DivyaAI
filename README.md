@@ -660,3 +660,9 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - Care (khana/paani/neend/dawai/padhai, raat ko sone ki yaad) aur 3.27 ki saaf head/body motion bhi isi zip me.
 - Rule: emotions se guilt-trip/rona-dhona rok-tok nahi.
 - Test/compile nahi hua.
+
+## v3.30 - Jarvis mode upgrade
+- **Real-time data:** badalne wali cheezon (news, mausam, score, bhav, latest) par Jarvis yaad se nahi, pehle get_weather/web_search/Google search se taaza data laata hai, freshness batata hai.
+- **Advanced problem-solving:** goal ek line me, steps, 2-3 options + trade-off, calculation double-check, clear recommendation + next action; tools (agent_task, do_steps, generate_code...) se execute.
+- **Adaptive learning:** preference/routine/correction par remember_fact, kaam se pehle recall_memory, agli baar usi tarah; passwords/OTP/card kabhi save nahi; forget_memory se bhula sakta hai.
+- Sirf Jarvis prompt (Persona.kt). Test nahi hua.
