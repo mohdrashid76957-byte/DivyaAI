@@ -238,7 +238,21 @@ fun AvatarHero(img: Int, faces: IntArray?, accent: Color, modifier: Modifier, cu
     val stage = AvatarBus.stage
     val smooth by animateFloatAsState(AvatarBus.level, tween(70), label = "lv")
     val speaking = smooth > 0.02f
-    val motion = rememberAvatarMotion()
+    val motion: androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit = {
+        val lv = smooth
+        val spk = AvatarBus.speaking || lv > 0.02f
+        val st = AvatarBus.stage
+        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.8f)
+        var ty = breath * 2.dp.toPx(); var tx = sway * 3.dp.toPx(); var rz = sway * 0.6f; var sc = 1f + 0.006f * breath
+        if (spk) {
+            ty -= lv * 5.dp.toPx()
+            rz += kotlin.math.sin(phase) * 1.5f * (0.4f + lv) + kotlin.math.sin(phase * 0.5f) * 0.8f
+            tx += kotlin.math.sin(phase * 0.5f) * 3.dp.toPx() * lv
+            sc += 0.022f * lv
+        } else if (st == 1 || st == 2) { rz += -2.5f; sc += 0.015f; ty -= 3.dp.toPx() }
+        else if (st == 3 || st == 4) { rz += 2.2f + glance * 1.2f; tx += glance * 5.dp.toPx() }
+        translationX = tx; translationY = ty; rotationZ = rz; scaleX = sc; scaleY = sc
+    }
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val r = size.minDimension * (0.40f + 0.12f * smooth)

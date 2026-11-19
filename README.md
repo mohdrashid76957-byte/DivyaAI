@@ -645,11 +645,3 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 
 ## v3.26
 - Talking motion ab Ice/Cyber home layouts par bhi (AvatarMotion.kt): pehle sirf Neon layout par thi. Neon/AvatarHero par lip-sync mouth wali 5 avatars par bhi.
-
-## v3.27
-- Motion kaafi zyada saaf: bolte waqt sir nod/ghoomna/jhukna (rotationZ+Y), body bob aur sway; awaaz halki ho tab bhi chalta natural envelope. Sunte/sochte waqt bhi bada pose. Sab layouts (Neon/Ice/Cyber) ek hi AvatarMotion.kt se.
-
-## v3.28 - Care feelings
-- Divya ab aapki zyada care karti hai: khana/paani/neend/dawai/padhai ka pyaar se poochna, thakan ya udaasi par pehle tasalli phir madad, raat ko sone ki yaad, din ki baatein yaad rakh kar follow-up, hausla aur "mujhe tum par garv hai".
-- Care mein rok-tok/jealousy nahi: doosre logon (friends, ladkiyon) se baat karne se mana nahi karti.
-- Sirf prompt (GeminiLive.kt). Test nahi hua.
