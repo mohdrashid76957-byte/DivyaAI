@@ -666,3 +666,9 @@ Jarvis (Playlist project) ke features mein se jo Divya mein pehle nahi the, aur 
 - **Advanced problem-solving:** goal ek line me, steps, 2-3 options + trade-off, calculation double-check, clear recommendation + next action; tools (agent_task, do_steps, generate_code...) se execute.
 - **Adaptive learning:** preference/routine/correction par remember_fact, kaam se pehle recall_memory, agli baar usi tarah; passwords/OTP/card kabhi save nahi; forget_memory se bhula sakta hai.
 - Sirf Jarvis prompt (Persona.kt). Test nahi hua.
+
+## v3.31 - Jarvis OS (unified naya design, Divya + Jarvis dono ke liye)
+- Naya theme **Jarvis OS** (Settings > UI Design se chuno): OLED dark, greeting, beech me 3D particle orb (Jarvis) ya glowing gol Divya avatar (Divya mode), ON/OFF pill + persona chip (Jarvis/Divya, session band hone par), live weather card (tap=retry), tiles Screen Share / Memories / Language, floating nav (Home, Chat, bada mic, Settings, Updates=About).
+- Files: OsHome.kt (new), MainActivity.kt (theme flag os, home, nav).
+- Baaki screens (Settings, Updates, Chat) purane design me; naya look sirf Home + nav. God Mode / Face Lock / Voice Clone / Drone / Smart Home abhi nahi.
+- Test/compile nahi hua.
