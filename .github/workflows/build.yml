@@ -1,9 +1,9 @@
-name: Build Divya APK
+name: Build Divya APK Release
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,46 +12,26 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Naya ZIP ho to project update karo
-        run: |
-          Z=$(ls *.zip 2>/dev/null | sort -V | tail -1)
-          if [ -n "$Z" ] && [ "$(cat .restored 2>/dev/null)" != "$Z" ]; then
-            echo "Restoring from: $Z"
-            mkdir _x && unzip -q "$Z" -d _x
-            if [ "$(ls _x | wc -l)" = "1" ] && [ -d "_x/$(ls _x)" ]; then cp -a _x/*/. . ; else cp -a _x/. . ; fi
-            rm -rf _x
-            echo "$Z" > .restored
-            git config user.name "divya-bot"
-            git config user.email "divya-bot@users.noreply.github.com"
-            git add -A
-            git commit -m "Update project from $Z" || true
-            git push || true
-          else
-            echo "ZIP naya nahi hai, source jaisa hai waisa hi"
-          fi
-
-      - uses: actions/setup-java@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.9
+          gradle-version: '8.9'
 
       - name: Build debug APK
-        run: gradle assembleDebug --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
 
-      - uses: actions/upload-artifact@v4
+      - name: Publish APK to Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: DivyaAI-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-
-      - name: Release mein APK daalo
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cp app/build/outputs/apk/debug/app-debug.apk DivyaAI.apk
-          gh release create "build-${{ github.run_number }}" DivyaAI.apk --title "Divya AI build ${{ github.run_number }}" --notes "Auto build" || true
+          tag_name: build-${{ github.run_number }}
+          name: Divya AI build ${{ github.run_number }}
+          files: app/build/outputs/apk/debug/app-debug.apk
